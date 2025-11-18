@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import { Bell, Loader2, Plus, X, LogOut, User, Clock, Droplet, Wind } from 'lucide-react';
 
