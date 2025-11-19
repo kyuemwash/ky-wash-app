@@ -1,8 +1,6 @@
 "use client";
-import { createContext } from "react";
 import React, { useState, useEffect } from 'react';
 import { Bell, Loader2, Plus, X, LogOut, User, Clock, Droplet, Wind } from 'lucide-react';
-
 
 const KYWash = () => {
   const [user, setUser] = useState(null);
@@ -47,7 +45,7 @@ const KYWash = () => {
             const nextInQueue = queue.find(q => q.machineType === m.type);
             if (nextInQueue) {
               alert(`${nextInQueue.name}, ${m.type} #${m.id} is now available for you!`);
-              setQueue(prev => prev.filter(q => q.id !== nextInQueue.id));
+              setQueue(prevQueue => prevQueue.filter(q => q.id !== nextInQueue.id));
             }
             return { ...m, status: 'available', timeLeft: 0, currentUser: null };
           }
