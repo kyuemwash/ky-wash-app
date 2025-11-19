@@ -3,6 +3,7 @@ import { createContext } from "react";
 import React, { useState, useEffect } from 'react';
 import { Bell, Loader2, Plus, X, LogOut, User, Clock, Droplet, Wind } from 'lucide-react';
 
+
 const KYWash = () => {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(true);
