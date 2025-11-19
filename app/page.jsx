@@ -57,6 +57,7 @@ const KYWash = () => {
     return () => clearInterval(timer);
   }, [queue]);
 
+  
   const handleAuth = () => {
     if (formData.name && formData.studentId && formData.phone) {
       setUser(formData);
