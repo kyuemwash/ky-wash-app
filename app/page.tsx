@@ -1,4 +1,3 @@
-James Low, [20/11/2025 1:53 PM]
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -45,7 +44,6 @@ const KYWash = () => {
     heavy: { name: 'Heavy Duty', time: 45 },
   };
 
-James Low, [20/11/2025 1:53 PM]
 const dryCategories = {
     quick: { name: 'Quick Dry', time: 20 },
     normal: { name: 'Normal', time: 40 },
@@ -180,7 +178,6 @@ const dryCategories = {
     ));
   };
 
-James Low, [20/11/2025 1:53 PM]
 const handleEndCycle = (machineId) => {
     const machine = machines.find(m => m.id === machineId);
     if (machine) {
@@ -307,7 +304,7 @@ const handleEndCycle = (machineId) => {
       <div className={min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'} flex items-center justify-center p-4}>
         <div className={${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 w-full max-w-md}>
 
-James Low, [20/11/2025 1:53 PM]
+
 <div className="text-center mb-8">
             <div className={inline-block p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-full mb-4}>
               <Droplet className={w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}} />
@@ -467,7 +464,7 @@ James Low, [20/11/2025 1:53 PM]
           </div>
           <div className={${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border}>
 
-James Low, [20/11/2025 1:53 PM]
+
 <div className="flex items-center justify-between">
               <div>
                 <p className={text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium}>Washer Waitlist</p>
@@ -549,7 +546,6 @@ James Low, [20/11/2025 1:53 PM]
             </div>
           </div>
 
-James Low, [20/11/2025 1:53 PM]
 <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className={text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}}>Dryers</h2>
@@ -625,7 +621,6 @@ James Low, [20/11/2025 1:53 PM]
               <div className="space-y-2">
                 {dryerWaitlist.map((item) => (
 
-James Low, [20/11/2025 1:53 PM]
 <div key={item.id} className={flex items-center justify-between p-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg}>
                     <div>
                       <p className={font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}}>{item.name}</p>
@@ -695,7 +690,6 @@ James Low, [20/11/2025 1:53 PM]
                 selectedMachineType === 'washer'
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
 
-James Low, [20/11/2025 1:53 PM]
 : 'bg-purple-600 hover:bg-purple-700 text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed}
             >
@@ -763,7 +757,6 @@ James Low, [20/11/2025 1:53 PM]
               <p className={text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 Last Maintenance: {selectedMachine.lastMaintenance}
 
-James Low, [20/11/2025 1:53 PM]
 </p>
             </div>
             {selectedMachine.issues.length > 0 && (
@@ -829,7 +822,6 @@ James Low, [20/11/2025 1:53 PM]
             <div className="mb-6">
               <h4 className={font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3}>Machine Health</h4>
 
-James Low, [20/11/2025 1:53 PM]
 <div className="space-y-2 max-h-64 overflow-y-auto">
                 {machines.map(m => (
                   <div key={m.id} className={flex items-center justify-between p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg}>
@@ -900,7 +892,6 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
             machine.status === 'available' && machine.enabled
               ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
 
-James Low, [20/11/2025 1:53 PM]
 : machine.status === 'in-use'
               ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
               : machine.status === 'completed'
@@ -991,7 +982,7 @@ James Low, [20/11/2025 1:53 PM]
 
       {machine.status === 'available' && machine.enabled && (
 
-James Low, [20/11/2025 1:53 PM]
+
 <div className="space-y-2">
           {Object.entries(categories).map(([key, cat]) => (
             <button
