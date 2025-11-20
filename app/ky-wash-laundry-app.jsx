@@ -68,7 +68,7 @@ const KYWash = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const logUsage = (machine) => {
+  const logUsage = (machine: any) => {
     const usage = {
       id: Date.now(),
       machineId: machine.id,
@@ -81,7 +81,7 @@ const KYWash = () => {
     setUsageHistory(prev => [...prev, usage]);
   };
 
-  const addNotification = (userData, type, machineId) => {
+  const addNotification = (userData: any, type: string, machineId: number) => {
     const notif = {
       id: Date.now(),
       user: userData,
@@ -128,7 +128,7 @@ const KYWash = () => {
     }
   };
 
-  const handleConfirmStart = (machine, category) => {
+  const handleConfirmStart = (machine: any, category: string) => {
     setConfirmModal({ machine, category });
   };
 
@@ -148,7 +148,7 @@ const KYWash = () => {
     setSelectedMachine(null);
   };
 
-  const handleCancelMachine = (machineId) => {
+  const handleCancelMachine = (machineId: number) => {
     setMachines(prev => prev.map(m => 
       m.id === machineId 
         ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
@@ -156,7 +156,7 @@ const KYWash = () => {
     ));
   };
 
-  const handleEndCycle = (machineId) => {
+  const handleEndCycle = (machineId: number) => {
     const machine = machines.find(m => m.id === machineId);
     if (machine) {
       logUsage(machine);
@@ -168,7 +168,7 @@ const KYWash = () => {
     ));
   };
 
-  const handleClothesCollected = (machineId) => {
+  const handleClothesCollected = (machineId: number) => {
     setMachines(prev => prev.map(m => 
       m.id === machineId 
         ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
@@ -182,7 +182,7 @@ const KYWash = () => {
     }
   };
 
-  const handleJoinWaitlist = (type) => {
+  const handleJoinWaitlist = (type: string) => {
     const newItem = {
       id: Date.now(),
       ...user,
@@ -197,7 +197,7 @@ const KYWash = () => {
     setShowWaitlistModal(false);
   };
 
-  const handleLeaveWaitlist = (type, itemId) => {
+  const handleLeaveWaitlist = (type: string, itemId: number) => {
     if (type === 'washer') {
       setWasherWaitlist(prev => prev.filter(item => item.id !== itemId));
     } else {
@@ -205,7 +205,7 @@ const KYWash = () => {
     }
   };
 
-  const toggleMachineAvailability = (machineId) => {
+  const toggleMachineAvailability = (machineId: number) => {
     setMachines(prev => prev.map(m => {
       if (m.id === machineId) {
         const newEnabled = !m.enabled;
@@ -239,36 +239,36 @@ const KYWash = () => {
     setShowMaintenanceModal(false);
   };
 
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getAvailableCount = (type) => {
+  const getAvailableCount = (type: string) => {
     return machines.filter(m => m.type === type && m.status === 'available' && m.enabled).length;
   };
 
-  const getTotalCount = (type) => {
+  const getTotalCount = (type: string) => {
     return machines.filter(m => m.type === type && m.enabled).length;
   };
 
   const getPeakHours = () => {
-    const hours = {};
-    usageHistory.forEach(u => {
+    const hours: any = {};
+    usageHistory.forEach((u: any) => {
       const hour = new Date(u.timestamp).getHours();
       hours[hour] = (hours[hour] || 0) + 1;
     });
-    const sorted = Object.entries(hours).sort((a, b) => b[1] - a[1]);
+    const sorted = Object.entries(hours).sort((a: any, b: any) => b[1] - a[1]);
     return sorted.slice(0, 3).map(([hour]) => `${hour}:00`).join(', ') || 'No data yet';
   };
 
   const getMostUsedCategory = () => {
-    const categories = {};
-    usageHistory.forEach(u => {
+    const categories: any = {};
+    usageHistory.forEach((u: any) => {
       categories[u.category] = (categories[u.category] || 0) + 1;
     });
-    const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    const sorted = Object.entries(categories).sort((a: any, b: any) => b[1] - a[1]);
     return sorted[0]?.[0] || 'No data yet';
   };
 
@@ -826,7 +826,7 @@ const KYWash = () => {
   );
 };
 
-const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, categories, onConfirmStart, onCancel, onEndCycle, onCollected, onToggleAvailability, onShowMaintenance, formatTime }) => {
+const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, categories, onConfirmStart, onCancel, onEndCycle, onCollected, onToggleAvailability, onShowMaintenance, formatTime }: any) => {
   return (
     <div 
       id={`machine-${machine.id}`}
