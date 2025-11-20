@@ -1,23 +1,42 @@
 "use client";
+
 import React, { useState, useEffect } from 'react';
-import { Bell, Loader2, Plus, X, LogOut, User, Clock, Droplet, Wind } from 'lucide-react';
+import { Bell, Plus, X, LogOut, User, Clock, Droplet, Wind, Settings, AlertCircle, CheckCircle, QrCode, TrendingUp, Wrench, Moon, Sun } from 'lucide-react';
 
 const KYWash = () => {
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(true);
   const [authMode, setAuthMode] = useState('login');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [qrInput, setQrInput] = useState('');
   const [machines, setMachines] = useState([
-    { id: 1, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
-    { id: 2, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
-    { id: 3, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
-    { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
-    { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
-    { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null },
+    { id: 1, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-001', totalCycles: 245, lastMaintenance: '2024-11-15', issues: [] },
+    { id: 2, type: 'washer', status: 'disabled', category: 'normal', timeLeft: 0, currentUser: null, enabled: false, qrCode: 'WASH-002', totalCycles: 189, lastMaintenance: '2024-11-10', issues: ['Motor issue', 'Needs repair'] },
+    { id: 3, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-003', totalCycles: 312, lastMaintenance: '2024-11-18', issues: [] },
+    { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-004', totalCycles: 278, lastMaintenance: '2024-11-12', issues: [] },
+    { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-005', totalCycles: 401, lastMaintenance: '2024-11-16', issues: [] },
+    { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-006', totalCycles: 156, lastMaintenance: '2024-11-19', issues: [] },
+    { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-001', totalCycles: 334, lastMaintenance: '2024-11-14', issues: [] },
+    { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-002', totalCycles: 289, lastMaintenance: '2024-11-17', issues: [] },
+    { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-003', totalCycles: 267, lastMaintenance: '2024-11-13', issues: [] },
+    { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-004', totalCycles: 412, lastMaintenance: '2024-11-11', issues: [] },
+    { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-005', totalCycles: 198, lastMaintenance: '2024-11-19', issues: [] },
+    { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-006', totalCycles: 223, lastMaintenance: '2024-11-15', issues: [] },
   ]);
-  const [queue, setQueue] = useState([]);
-  const [showQueueModal, setShowQueueModal] = useState(false);
-  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [washerWaitlist, setWasherWaitlist] = useState([]);
+  const [dryerWaitlist, setDryerWaitlist] = useState([]);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [selectedMachineType, setSelectedMachineType] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [formData, setFormData] = useState({ name: '', studentId: '', phone: '' });
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [maintenanceNote, setMaintenanceNote] = useState('');
+  const [usageHistory, setUsageHistory] = useState([]);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const washCategories = {
     quick: { name: 'Quick Wash', time: 15 },
@@ -37,17 +56,9 @@ const KYWash = () => {
         if (m.status === 'in-use' && m.timeLeft > 0) {
           const newTime = m.timeLeft - 1;
           if (newTime === 0) {
-            // Notify user
-            if (m.currentUser) {
-              alert(`${m.currentUser.name}, your ${m.type} (#${m.id}) is done!`);
-            }
-            // Check queue for next user
-            const nextInQueue = queue.find(q => q.machineType === m.type);
-            if (nextInQueue) {
-              alert(`${nextInQueue.name}, ${m.type} #${m.id} is now available for you!`);
-              setQueue(prevQueue => prevQueue.filter(q => q.id !== nextInQueue.id));
-            }
-            return { ...m, status: 'available', timeLeft: 0, currentUser: null };
+            addNotification(m.currentUser, m.type, m.id);
+            logUsage(m);
+            return { ...m, status: 'completed', timeLeft: 0, totalCycles: m.totalCycles + 1 };
           }
           return { ...m, timeLeft: newTime };
         }
@@ -55,18 +66,75 @@ const KYWash = () => {
       }));
     }, 1000);
     return () => clearInterval(timer);
-  }, [queue]);
+  }, []);
 
-  
-  const handleAuth = () => {
-    if (formData.name && formData.studentId && formData.phone) {
-      setUser(formData);
-      setShowAuth(false);
+  const logUsage = (machine) => {
+    const usage = {
+      id: Date.now(),
+      machineId: machine.id,
+      machineType: machine.type,
+      user: machine.currentUser.name,
+      category: machine.category,
+      timestamp: new Date().toLocaleString(),
+      duration: machine.type === 'washer' ? washCategories[machine.category].time : dryCategories[machine.category].time,
+    };
+    setUsageHistory(prev => [...prev, usage]);
+  };
+
+  const addNotification = (userData, type, machineId) => {
+    const notif = {
+      id: Date.now(),
+      user: userData,
+      type,
+      machineId,
+      timestamp: new Date().toLocaleTimeString(),
+      message: `${userData.name}, your ${type} #${machineId} is done!`,
+    };
+    setNotifications(prev => [...prev, notif]);
+    
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('KY Wash', {
+        body: notif.message,
+        icon: '/laundry-icon.png'
+      });
     }
   };
 
-  const handleStartMachine = (machine, category) => {
-    if (machine.status !== 'available') return;
+  const requestNotificationPermission = () => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  };
+
+  const handleAuth = () => {
+    if (formData.name && formData.studentId && formData.phone) {
+      const userData = { ...formData };
+      setUser(userData);
+      setIsAdmin(formData.studentId === 'ADMIN');
+      setShowAuth(false);
+      requestNotificationPermission();
+    }
+  };
+
+  const handleQRScan = () => {
+    const machine = machines.find(m => m.qrCode === qrInput.toUpperCase());
+    if (machine) {
+      setSelectedMachine(machine);
+      setShowQRScanner(false);
+      setQrInput('');
+      document.getElementById(`machine-${machine.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      alert('Invalid QR code! Please scan a valid machine QR code.');
+    }
+  };
+
+  const handleConfirmStart = (machine, category) => {
+    setConfirmModal({ machine, category });
+  };
+
+  const handleStartMachine = () => {
+    const { machine, category } = confirmModal;
+    if (machine.status !== 'available' || !machine.enabled) return;
     
     const categories = machine.type === 'washer' ? washCategories : dryCategories;
     const time = categories[category].time * 60;
@@ -76,17 +144,99 @@ const KYWash = () => {
         ? { ...m, status: 'in-use', category, timeLeft: time, currentUser: user }
         : m
     ));
+    setConfirmModal(null);
+    setSelectedMachine(null);
   };
 
-  const handleJoinQueue = (machineType) => {
-    const newQueueItem = {
+  const handleCancelMachine = (machineId) => {
+    setMachines(prev => prev.map(m => 
+      m.id === machineId 
+        ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
+        : m
+    ));
+  };
+
+  const handleEndCycle = (machineId) => {
+    const machine = machines.find(m => m.id === machineId);
+    if (machine) {
+      logUsage(machine);
+    }
+    setMachines(prev => prev.map(m => 
+      m.id === machineId 
+        ? { ...m, status: 'completed', timeLeft: 0, totalCycles: m.totalCycles + 1 }
+        : m
+    ));
+  };
+
+  const handleClothesCollected = (machineId) => {
+    setMachines(prev => prev.map(m => 
+      m.id === machineId 
+        ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
+        : m
+    ));
+    
+    const machine = machines.find(m => m.id === machineId);
+    const waitlist = machine.type === 'washer' ? washerWaitlist : dryerWaitlist;
+    if (waitlist.length > 0) {
+      alert(`Attention: ${machine.type} #${machineId} is now available!`);
+    }
+  };
+
+  const handleJoinWaitlist = (type) => {
+    const newItem = {
       id: Date.now(),
       ...user,
-      machineType,
       timestamp: new Date().toLocaleTimeString(),
     };
-    setQueue(prev => [...prev, newQueueItem]);
-    setShowQueueModal(false);
+    
+    if (type === 'washer') {
+      setWasherWaitlist(prev => [...prev, newItem]);
+    } else {
+      setDryerWaitlist(prev => [...prev, newItem]);
+    }
+    setShowWaitlistModal(false);
+  };
+
+  const handleLeaveWaitlist = (type, itemId) => {
+    if (type === 'washer') {
+      setWasherWaitlist(prev => prev.filter(item => item.id !== itemId));
+    } else {
+      setDryerWaitlist(prev => prev.filter(item => item.id !== itemId));
+    }
+  };
+
+  const toggleMachineAvailability = (machineId) => {
+    setMachines(prev => prev.map(m => {
+      if (m.id === machineId) {
+        const newEnabled = !m.enabled;
+        return {
+          ...m,
+          enabled: newEnabled,
+          status: newEnabled ? 'available' : 'disabled',
+          timeLeft: 0,
+          currentUser: null
+        };
+      }
+      return m;
+    }));
+  };
+
+  const handleAddMaintenanceNote = () => {
+    if (!maintenanceNote.trim()) return;
+    
+    setMachines(prev => prev.map(m => {
+      if (m.id === selectedMachine.id) {
+        return {
+          ...m,
+          issues: [...m.issues, maintenanceNote],
+          lastMaintenance: new Date().toISOString().split('T')[0]
+        };
+      }
+      return m;
+    }));
+    
+    setMaintenanceNote('');
+    setShowMaintenanceModal(false);
   };
 
   const formatTime = (seconds) => {
@@ -95,19 +245,43 @@ const KYWash = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const availableWashers = machines.filter(m => m.type === 'washer' && m.status === 'available').length;
-  const availableDryers = machines.filter(m => m.type === 'dryer' && m.status === 'available').length;
+  const getAvailableCount = (type) => {
+    return machines.filter(m => m.type === type && m.status === 'available' && m.enabled).length;
+  };
+
+  const getTotalCount = (type) => {
+    return machines.filter(m => m.type === type && m.enabled).length;
+  };
+
+  const getPeakHours = () => {
+    const hours = {};
+    usageHistory.forEach(u => {
+      const hour = new Date(u.timestamp).getHours();
+      hours[hour] = (hours[hour] || 0) + 1;
+    });
+    const sorted = Object.entries(hours).sort((a, b) => b[1] - a[1]);
+    return sorted.slice(0, 3).map(([hour]) => `${hour}:00`).join(', ') || 'No data yet';
+  };
+
+  const getMostUsedCategory = () => {
+    const categories = {};
+    usageHistory.forEach(u => {
+      categories[u.category] = (categories[u.category] || 0) + 1;
+    });
+    const sorted = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || 'No data yet';
+  };
 
   if (showAuth) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'} flex items-center justify-center p-4`}>
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 w-full max-w-md`}>
           <div className="text-center mb-8">
-            <div className="inline-block p-3 bg-blue-100 rounded-full mb-4">
-              <Droplet className="w-8 h-8 text-blue-600" />
+            <div className={`inline-block p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-full mb-4`}>
+              <Droplet className={`w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">KY Wash</h1>
-            <p className="text-gray-600 mt-2">Smart Laundry Management</p>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>KY Wash</h1>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2`}>Smart Laundry Management System</p>
           </div>
 
           <div className="flex gap-2 mb-6">
@@ -116,7 +290,7 @@ const KYWash = () => {
               className={`flex-1 py-2 rounded-lg font-medium transition ${
                 authMode === 'login' 
                   ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-600'
+                  : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
               }`}
             >
               Login
@@ -126,7 +300,7 @@ const KYWash = () => {
               className={`flex-1 py-2 rounded-lg font-medium transition ${
                 authMode === 'register' 
                   ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-100 text-gray-600'
+                  : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
               }`}
             >
               Register
@@ -137,21 +311,21 @@ const KYWash = () => {
             <input
               type="text"
               placeholder="Full Name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
             <input
               type="text"
-              placeholder="Student ID"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Student ID (Use 'ADMIN' for admin access)"
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={formData.studentId}
               onChange={(e) => setFormData({...formData, studentId: e.target.value})}
             />
             <input
               type="tel"
               placeholder="Phone Number"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={formData.phone}
               onChange={(e) => setFormData({...formData, phone: e.target.value})}
             />
@@ -162,22 +336,62 @@ const KYWash = () => {
               {authMode === 'login' ? 'Login' : 'Register'}
             </button>
           </div>
+
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`w-full mt-4 ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'} py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition flex items-center justify-center gap-2`}
+          >
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-sm border-b sticky top-0 z-40`}>
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Droplet className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-800">KY Wash</h1>
+            <div>
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>KY Wash</h1>
+              {isAdmin && <span className="text-xs text-orange-600 font-medium">Admin Mode</span>}
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <button
+              onClick={() => setShowQRScanner(true)}
+              className="text-blue-600 hover:text-blue-700"
+              title="Scan QR Code"
+            >
+              <QrCode className="w-6 h-6" />
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowAnalytics(true)}
+                className="text-green-600 hover:text-green-700"
+                title="View Analytics"
+              >
+                <TrendingUp className="w-6 h-6" />
+              </button>
+            )}
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <div className="relative">
+              <Bell className={`w-6 h-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'} cursor-pointer hover:text-blue-600 transition`} />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {notifications.length}
+                </span>
+              )}
+            </div>
+            <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               <User className="w-4 h-4" />
               <span>{user.name}</span>
             </div>
@@ -185,8 +399,9 @@ const KYWash = () => {
               onClick={() => {
                 setUser(null);
                 setShowAuth(true);
+                setIsAdmin(false);
               }}
-              className="text-gray-600 hover:text-gray-800 transition"
+              className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800 transition`}
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -194,72 +409,218 @@ const KYWash = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-600 font-medium">Washers Available</p>
-                <p className="text-3xl font-bold text-blue-700">{availableWashers}/3</p>
+                <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
               </div>
-              <Droplet className="w-10 h-10 text-blue-400" />
+              <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
             </div>
           </div>
-          <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+          <div className={`${darkMode ? 'bg-purple-900 border-purple-800' : 'bg-purple-50 border-purple-100'} rounded-xl p-4 border`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-600 font-medium">Dryers Available</p>
-                <p className="text-3xl font-bold text-purple-700">{availableDryers}/3</p>
+                <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-600'} font-medium`}>Dryers</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>{getAvailableCount('dryer')}/{getTotalCount('dryer')}</p>
               </div>
-              <Wind className="w-10 h-10 text-purple-400" />
+              <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
+            </div>
+          </div>
+          <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{washerWaitlist.length}</p>
+              </div>
+              <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
+            </div>
+          </div>
+          <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'} font-medium`}>Dryer Waitlist</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>{dryerWaitlist.length}</p>
+              </div>
+              <Clock className={`w-10 h-10 ${darkMode ? 'text-pink-400' : 'text-pink-400'}`} />
             </div>
           </div>
         </div>
 
-        {/* Machines */}
+        {notifications.length > 0 && (
+          <div className={`mb-6 ${darkMode ? 'bg-yellow-900 border-yellow-800' : 'bg-yellow-50 border-yellow-200'} border rounded-xl p-4`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-800'} flex items-center gap-2`}>
+                <Bell className="w-5 h-5" />
+                Recent Notifications
+              </h3>
+              <button
+                onClick={() => setNotifications([])}
+                className={`${darkMode ? 'text-yellow-400 hover:text-yellow-200' : 'text-yellow-700 hover:text-yellow-900'} text-sm`}
+              >
+                Clear All
+              </button>
+            </div>
+            <div className="space-y-2">
+              {notifications.slice(-3).reverse().map(notif => (
+                <div key={notif.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-3 text-sm`}>
+                  <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{notif.message}</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mt-1`}>{notif.timestamp}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Washing Machines</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Washing Machines</h2>
+              <button
+                onClick={() => {
+                  setSelectedMachineType('washer');
+                  setShowWaitlistModal(true);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Join Waitlist
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {machines.filter(m => m.type === 'washer').map(machine => (
-                <div key={machine.id} className={`bg-white rounded-xl p-5 shadow-sm border-2 transition ${
-                  machine.status === 'available' ? 'border-green-200' : 'border-gray-200'
-                }`}>
+                <div 
+                  key={machine.id} 
+                  id={`machine-${machine.id}`}
+                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border-2 transition ${
+                    selectedMachine?.id === machine.id ? 'border-blue-500 ring-2 ring-blue-300' :
+                    machine.status === 'available' && machine.enabled ? darkMode ? 'border-green-700' : 'border-green-200' : 
+                    machine.status === 'disabled' ? 'border-gray-300 opacity-60' : darkMode ? 'border-gray-700' : 'border-gray-200'
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-semibold text-gray-800">Washer #{machine.id}</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      machine.status === 'available' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {machine.status === 'available' ? 'Available' : 'In Use'}
-                    </span>
+                    <div>
+                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Washer #{machine.id}</span>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
+                        <QrCode className="w-3 h-3" />
+                        {machine.qrCode}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        machine.status === 'available' && machine.enabled
+                          ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
+                          : machine.status === 'in-use'
+                          ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+                          : machine.status === 'completed'
+                          ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {machine.status === 'disabled' ? 'Disabled' : 
+                         machine.status === 'available' ? 'Available' : 
+                         machine.status === 'completed' ? 'Done' : 'In Use'}
+                      </span>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => toggleMachineAvailability(machine.id)}
+                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedMachine(machine);
+                              setShowMaintenanceModal(true);
+                            }}
+                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+                          >
+                            <Wrench className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  {machine.status === 'in-use' && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                        <Clock className="w-4 h-4" />
-                        <span>{formatTime(machine.timeLeft)} remaining</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        User: {machine.currentUser?.name}
-                      </div>
+                  {isAdmin && (
+                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                      <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
+                      {machine.issues.length > 0 && (
+                        <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
+                      )}
                     </div>
                   )}
 
-                  {machine.status === 'available' && (
+                  {machine.status === 'in-use' && (
+                    <div className="mb-4">
+                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                        <Clock className="w-4 h-4" />
+                        <span>{formatTime(machine.timeLeft)} remaining</span>
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                        User: {machine.currentUser?.name}
+                      </div>
+                      {user.studentId === machine.currentUser?.studentId && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCancelMachine(machine.id)}
+                            className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
+                          >
+                            Cancel
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleEndCycle(machine.id)}
+                              className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
+                            >
+                              End Now
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {machine.status === 'completed' && (
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2`}>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Cycle completed!</span>
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                        User: {machine.currentUser?.name}
+                      </div>
+                      {user.studentId === machine.currentUser?.studentId && (
+                        <button
+                          onClick={() => handleClothesCollected(machine.id)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          Clothes Collected
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {machine.status === 'available' && machine.enabled && (
                     <div className="space-y-2">
                       {Object.entries(washCategories).map(([key, cat]) => (
                         <button
                           key={key}
-                          onClick={() => handleStartMachine(machine, key)}
-                          className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 rounded-lg text-sm font-medium transition"
+                          onClick={() => handleConfirmStart(machine, key)}
+                          className={`w-full ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
                         >
                           {cat.name} ({cat.time}min)
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {machine.status === 'disabled' && (
+                    <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Machine temporarily unavailable</span>
                     </div>
                   )}
                 </div>
@@ -268,109 +629,429 @@ const KYWash = () => {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Dryers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dryers</h2>
+              <button
+                onClick={() => {
+                  setSelectedMachineType('dryer');
+                  setShowWaitlistModal(true);
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Join Waitlist
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {machines.filter(m => m.type === 'dryer').map(machine => (
-                <div key={machine.id} className={`bg-white rounded-xl p-5 shadow-sm border-2 transition ${
-                  machine.status === 'available' ? 'border-green-200' : 'border-gray-200'
-                }`}>
+                <div 
+                  key={machine.id}
+                  id={`machine-${machine.id}`}
+                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border-2 transition ${
+                    selectedMachine?.id === machine.id ? 'border-purple-500 ring-2 ring-purple-300' :
+                    machine.status === 'available' && machine.enabled ? darkMode ? 'border-green-700' : 'border-green-200' : 
+                    machine.status === 'disabled' ? 'border-gray-300 opacity-60' : darkMode ? 'border-gray-700' : 'border-gray-200'
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-semibold text-gray-800">Dryer #{machine.id}</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      machine.status === 'available' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {machine.status === 'available' ? 'Available' : 'In Use'}
-                    </span>
+                    <div>
+                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dryer #{machine.id}</span>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
+                        <QrCode className="w-3 h-3" />
+                        {machine.qrCode}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        machine.status === 'available' && machine.enabled
+                          ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
+                          : machine.status === 'in-use'
+                          ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+                          : machine.status === 'completed'
+                          ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+                          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {machine.status === 'disabled' ? 'Disabled' : 
+                         machine.status === 'available' ? 'Available' : 
+                         machine.status === 'completed' ? 'Done' : 'In Use'}
+                      </span>
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => toggleMachineAvailability(machine.id)}
+                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedMachine(machine);
+                              setShowMaintenanceModal(true);
+                            }}
+                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+                          >
+                            <Wrench className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  {machine.status === 'in-use' && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                        <Clock className="w-4 h-4" />
-                        <span>{formatTime(machine.timeLeft)} remaining</span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        User: {machine.currentUser?.name}
-                      </div>
+                  {isAdmin && (
+                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                      <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
+                      {machine.issues.length > 0 && (
+                        <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
+                      )}
                     </div>
                   )}
 
-                  {machine.status === 'available' && (
+                  {machine.status === 'in-use' && (
+                    <div className="mb-4">
+                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                        <Clock className="w-4 h-4" />
+                        <span>{formatTime(machine.timeLeft)} remaining</span>
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                        User: {machine.currentUser?.name}
+                      </div>
+                      {user.studentId === machine.currentUser?.studentId && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCancelMachine(machine.id)}
+                            className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
+                          >
+                            Cancel
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleEndCycle(machine.id)}
+                              className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
+                            >
+                              End Now
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {machine.status === 'completed' && (
+                    <div className="space-y-2">
+                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2`}>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Cycle completed!</span>
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+                        User: {machine.currentUser?.name}
+                      </div>
+                      {user.studentId === machine.currentUser?.studentId && (
+                        <button
+                          onClick={() => handleClothesCollected(machine.id)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition"
+                        >
+                          Clothes Collected
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {machine.status === 'available' && machine.enabled && (
                     <div className="space-y-2">
                       {Object.entries(dryCategories).map(([key, cat]) => (
                         <button
                           key={key}
-                          onClick={() => handleStartMachine(machine, key)}
-                          className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-2 rounded-lg text-sm font-medium transition"
+                          onClick={() => handleConfirmStart(machine, key)}
+                          className={`w-full ${darkMode ? 'bg-purple-900 hover:bg-purple-800 text-purple-200' : 'bg-purple-50 hover:bg-purple-100 text-purple-700'} py-2 rounded-lg text-sm font-medium transition`}
                         >
                           {cat.name} ({cat.time}min)
                         </button>
                       ))}
                     </div>
                   )}
+
+                  {machine.status === 'disabled' && (
+                    <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Machine temporarily unavailable</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Queue Section */}
-        <div className="mt-6 bg-white rounded-xl p-5 shadow-sm border">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Queue ({queue.length})</h2>
-            <button
-              onClick={() => setShowQueueModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Join Queue
-            </button>
-          </div>
-          
-          {queue.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No one in queue</p>
-          ) : (
-            <div className="space-y-2">
-              {queue.map((item, idx) => (
-                <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-800">#{idx + 1} - {item.name}</p>
-                    <p className="text-sm text-gray-600">{item.machineType} • {item.phone}</p>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
+            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Washer Waitlist</h3>
+            {washerWaitlist.length === 0 ? (
+              <p className={`${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No one waiting</p>
+            ) : (
+              <div className="space-y-2">
+                {washerWaitlist.map((item) => (
+                  <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.name}</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.phone}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{item.timestamp}</span>
+                      {(user.studentId === item.studentId || isAdmin) && (
+                        <button
+                          onClick={() => handleLeaveWaitlist('washer', item.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500">{item.timestamp}</span>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
+            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Dryer Waitlist</h3>
+            {dryerWaitlist.length === 0 ? (
+              <p className={`${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No one waiting</p>
+            ) : (
+              <div className="space-y-2">
+                {dryerWaitlist.map((item) => (
+                  <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.name}</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.phone}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{item.timestamp}</span>
+                      {(user.studentId === item.studentId || isAdmin) && (
+                        <button
+                          onClick={() => handleLeaveWaitlist('dryer', item.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Queue Modal */}
-      {showQueueModal && (
+      {showQRScanner && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Join Queue</h3>
-              <button onClick={() => setShowQueueModal(false)} className="text-gray-500 hover:text-gray-700">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Scan QR Code</h3>
+              <button onClick={() => setShowQRScanner(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <p className="text-gray-600 mb-4">Select machine type:</p>
-            <div className="space-y-3">
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>Enter the QR code from the machine</p>
+            <input
+              type="text"
+              placeholder="e.g., WASH-001 or DRY-003"
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
+              value={qrInput}
+              onChange={(e) => setQrInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleQRScan()}
+            />
+            <button
+              onClick={handleQRScan}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
+            >
+              Find Machine
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showWaitlistModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Join Waitlist</h3>
+              <button onClick={() => setShowWaitlistModal(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>You will be notified when a machine becomes available</p>
+            <button
+              onClick={() => handleJoinWaitlist(selectedMachineType)}
+              className={`w-full py-3 rounded-lg font-medium transition ${
+                selectedMachineType === 'washer'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              }`}
+            >
+              Join {selectedMachineType === 'washer' ? 'Washer' : 'Dryer'} Waitlist
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Confirm Start</h3>
+              <button onClick={() => setConfirmModal(null)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Start <strong>{confirmModal.machine.type} #{confirmModal.machine.id}</strong>
+              </p>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
+                Cycle: <strong>{confirmModal.machine.type === 'washer' ? washCategories[confirmModal.category].name : dryCategories[confirmModal.category].name}</strong>
+              </p>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
+                Duration: <strong>{confirmModal.machine.type === 'washer' ? washCategories[confirmModal.category].time : dryCategories[confirmModal.category].time} minutes</strong>
+              </p>
+            </div>
+            <div className="flex gap-3">
               <button
-                onClick={() => handleJoinQueue('washer')}
-                className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 rounded-lg font-medium transition"
+                onClick={() => setConfirmModal(null)}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} py-3 rounded-lg font-medium transition`}
               >
-                Washer Queue
+                Cancel
               </button>
               <button
-                onClick={() => handleJoinQueue('dryer')}
-                className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-3 rounded-lg font-medium transition"
+                onClick={handleStartMachine}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
               >
-                Dryer Queue
+                Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMaintenanceModal && selectedMachine && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Maintenance Log</h3>
+              <button onClick={() => setShowMaintenanceModal(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                <strong>{selectedMachine.type.toUpperCase()} #{selectedMachine.id}</strong>
+              </p>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Total Cycles: {selectedMachine.totalCycles}
+              </p>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Last Maintenance: {selectedMachine.lastMaintenance}
+              </p>
+            </div>
+            {selectedMachine.issues.length > 0 && (
+              <div className="mb-4">
+                <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Issue History:</h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {selectedMachine.issues.map((issue, idx) => (
+                    <p key={idx} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
+                      • {issue}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <textarea
+              placeholder="Add maintenance note..."
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
+              rows="3"
+              value={maintenanceNote}
+              onChange={(e) => setMaintenanceNote(e.target.value)}
+            />
+            <button
+              onClick={handleAddMaintenanceNote}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
+            >
+              Add Note
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showAnalytics && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-2xl w-full my-8`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Usage Analytics</h3>
+              <button onClick={() => setShowAnalytics(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className={`${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg p-4`}>
+                <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium mb-2`}>Total Cycles Today</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{usageHistory.length}</p>
+              </div>
+              <div className={`${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg p-4`}>
+                <p className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-600'} font-medium mb-2`}>Machines Active</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-green-200' : 'text-green-700'}`}>
+                  {machines.filter(m => m.status === 'in-use').length}
+                </p>
+              </div>
+              <div className={`${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg p-4`}>
+                <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-600'} font-medium mb-2`}>Peak Hours</p>
+                <p className={`text-sm font-bold ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>{getPeakHours()}</p>
+              </div>
+              <div className={`${darkMode ? 'bg-orange-900' : 'bg-orange-50'} rounded-lg p-4`}>
+                <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium mb-2`}>Most Used Cycle</p>
+                <p className={`text-sm font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{getMostUsedCategory()}</p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Machine Health</h4>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {machines.map(m => (
+                  <div key={m.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                        {m.type.toUpperCase()} #{m.id}
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                        {m.totalCycles} cycles | {m.issues.length} issues
+                      </p>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      m.totalCycles > 350 ? darkMode ? 'bg-red-900 text-red-200' : 'bg-red-100 text-red-700' :
+                      m.totalCycles > 250 ? darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-700' :
+                      darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {m.totalCycles > 350 ? 'High Usage' : m.totalCycles > 250 ? 'Medium' : 'Good'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Recent Usage History</h4>
+              <div className={`space-y-2 max-h-48 overflow-y-auto ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3`}>
+                {usageHistory.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No usage data yet</p>
+                ) : (
+                  usageHistory.slice(-10).reverse().map(usage => (
+                    <div key={usage.id} className={`flex items-center justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <span>{usage.machineType.toUpperCase()} #{usage.machineId} - {usage.user}</span>
+                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{usage.timestamp}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
