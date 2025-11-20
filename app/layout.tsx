@@ -3,7 +3,16 @@ import React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
+
+export const metadata = {
+  title: 'KY Wash - Smart Laundry Management',
+  description: 'Real-time laundry machine availability system',
+}
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -32,5 +41,10 @@ export default function RootLayout({
       </body>
     </html>
   );
+}
+        {children}
+      </body>
+    </html>
+  )
 }
 
