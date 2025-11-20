@@ -491,139 +491,22 @@ const KYWash = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {machines.filter(m => m.type === 'washer').map(machine => (
-                <div 
-                  key={machine.id} 
-                  id={`machine-${machine.id}`}
-                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border-2 transition ${
-                    selectedMachine?.id === machine.id ? 'border-blue-500 ring-2 ring-blue-300' :
-                    machine.status === 'available' && machine.enabled ? darkMode ? 'border-green-700' : 'border-green-200' : 
-                    machine.status === 'disabled' ? 'border-gray-300 opacity-60' : darkMode ? 'border-gray-700' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Washer #{machine.id}</span>
-                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
-                        <QrCode className="w-3 h-3" />
-                        {machine.qrCode}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        machine.status === 'available' && machine.enabled
-                          ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
-                          : machine.status === 'in-use'
-                          ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
-                          : machine.status === 'completed'
-                          ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {machine.status === 'disabled' ? 'Disabled' : 
-                         machine.status === 'available' ? 'Available' : 
-                         machine.status === 'completed' ? 'Done' : 'In Use'}
-                      </span>
-                      {isAdmin && (
-                        <>
-                          <button
-                            onClick={() => toggleMachineAvailability(machine.id)}
-                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedMachine(machine);
-                              setShowMaintenanceModal(true);
-                            }}
-                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
-                          >
-                            <Wrench className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {isAdmin && (
-                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                      <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
-                      {machine.issues.length > 0 && (
-                        <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'in-use' && (
-                    <div className="mb-4">
-                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
-                        <Clock className="w-4 h-4" />
-                        <span>{formatTime(machine.timeLeft)} remaining</span>
-                      </div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                        User: {machine.currentUser?.name}
-                      </div>
-                      {user.studentId === machine.currentUser?.studentId && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleCancelMachine(machine.id)}
-                            className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
-                          >
-                            Cancel
-                          </button>
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleEndCycle(machine.id)}
-                              className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
-                            >
-                              End Now
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'completed' && (
-                    <div className="space-y-2">
-                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2`}>
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Cycle completed!</span>
-                      </div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                        User: {machine.currentUser?.name}
-                      </div>
-                      {user.studentId === machine.currentUser?.studentId && (
-                        <button
-                          onClick={() => handleClothesCollected(machine.id)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition"
-                        >
-                          Clothes Collected
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'available' && machine.enabled && (
-                    <div className="space-y-2">
-                      {Object.entries(washCategories).map(([key, cat]) => (
-                        <button
-                          key={key}
-                          onClick={() => handleConfirmStart(machine, key)}
-                          className={`w-full ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
-                        >
-                          {cat.name} ({cat.time}min)
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {machine.status === 'disabled' && (
-                    <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Machine temporarily unavailable</span>
-                    </div>
-                  )}
-                </div>
+                <MachineCard
+                  key={machine.id}
+                  machine={machine}
+                  darkMode={darkMode}
+                  selectedMachine={selectedMachine}
+                  isAdmin={isAdmin}
+                  user={user}
+                  categories={washCategories}
+                  onConfirmStart={handleConfirmStart}
+                  onCancel={handleCancelMachine}
+                  onEndCycle={handleEndCycle}
+                  onCollected={handleClothesCollected}
+                  onToggleAvailability={toggleMachineAvailability}
+                  onShowMaintenance={(m) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                  formatTime={formatTime}
+                />
               ))}
             </div>
           </div>
@@ -644,139 +527,22 @@ const KYWash = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {machines.filter(m => m.type === 'dryer').map(machine => (
-                <div 
+                <MachineCard
                   key={machine.id}
-                  id={`machine-${machine.id}`}
-                  className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border-2 transition ${
-                    selectedMachine?.id === machine.id ? 'border-purple-500 ring-2 ring-purple-300' :
-                    machine.status === 'available' && machine.enabled ? darkMode ? 'border-green-700' : 'border-green-200' : 
-                    machine.status === 'disabled' ? 'border-gray-300 opacity-60' : darkMode ? 'border-gray-700' : 'border-gray-200'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dryer #{machine.id}</span>
-                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
-                        <QrCode className="w-3 h-3" />
-                        {machine.qrCode}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        machine.status === 'available' && machine.enabled
-                          ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
-                          : machine.status === 'in-use'
-                          ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
-                          : machine.status === 'completed'
-                          ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
-                          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {machine.status === 'disabled' ? 'Disabled' : 
-                         machine.status === 'available' ? 'Available' : 
-                         machine.status === 'completed' ? 'Done' : 'In Use'}
-                      </span>
-                      {isAdmin && (
-                        <>
-                          <button
-                            onClick={() => toggleMachineAvailability(machine.id)}
-                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
-                          >
-                            <Settings className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedMachine(machine);
-                              setShowMaintenanceModal(true);
-                            }}
-                            className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
-                          >
-                            <Wrench className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {isAdmin && (
-                    <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                      <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
-                      {machine.issues.length > 0 && (
-                        <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'in-use' && (
-                    <div className="mb-4">
-                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
-                        <Clock className="w-4 h-4" />
-                        <span>{formatTime(machine.timeLeft)} remaining</span>
-                      </div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                        User: {machine.currentUser?.name}
-                      </div>
-                      {user.studentId === machine.currentUser?.studentId && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleCancelMachine(machine.id)}
-                            className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
-                          >
-                            Cancel
-                          </button>
-                          {isAdmin && (
-                            <button
-                              onClick={() => handleEndCycle(machine.id)}
-                              className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
-                            >
-                              End Now
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'completed' && (
-                    <div className="space-y-2">
-                      <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2`}>
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Cycle completed!</span>
-                      </div>
-                      <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-                        User: {machine.currentUser?.name}
-                      </div>
-                      {user.studentId === machine.currentUser?.studentId && (
-                        <button
-                          onClick={() => handleClothesCollected(machine.id)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition"
-                        >
-                          Clothes Collected
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {machine.status === 'available' && machine.enabled && (
-                    <div className="space-y-2">
-                      {Object.entries(dryCategories).map(([key, cat]) => (
-                        <button
-                          key={key}
-                          onClick={() => handleConfirmStart(machine, key)}
-                          className={`w-full ${darkMode ? 'bg-purple-900 hover:bg-purple-800 text-purple-200' : 'bg-purple-50 hover:bg-purple-100 text-purple-700'} py-2 rounded-lg text-sm font-medium transition`}
-                        >
-                          {cat.name} ({cat.time}min)
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {machine.status === 'disabled' && (
-                    <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Machine temporarily unavailable</span>
-                    </div>
-                  )}
-                </div>
+                  machine={machine}
+                  darkMode={darkMode}
+                  selectedMachine={selectedMachine}
+                  isAdmin={isAdmin}
+                  user={user}
+                  categories={dryCategories}
+                  onConfirmStart={handleConfirmStart}
+                  onCancel={handleCancelMachine}
+                  onEndCycle={handleEndCycle}
+                  onCollected={handleClothesCollected}
+                  onToggleAvailability={toggleMachineAvailability}
+                  onShowMaintenance={(m) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                  formatTime={formatTime}
+                />
               ))}
             </div>
           </div>
@@ -968,7 +734,7 @@ const KYWash = () => {
             <textarea
               placeholder="Add maintenance note..."
               className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
-              rows="3"
+              rows={3}
               value={maintenanceNote}
               onChange={(e) => setMaintenanceNote(e.target.value)}
             />
@@ -1054,6 +820,146 @@ const KYWash = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, categories, onConfirmStart, onCancel, onEndCycle, onCollected, onToggleAvailability, onShowMaintenance, formatTime }) => {
+  return (
+    <div 
+      id={`machine-${machine.id}`}
+      className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-5 shadow-sm border-2 transition ${
+        selectedMachine?.id === machine.id ? 'border-blue-500 ring-2 ring-blue-300' :
+        machine.status === 'available' && machine.enabled ? darkMode ? 'border-green-700' : 'border-green-200' : 
+        machine.status === 'disabled' ? 'border-gray-300 opacity-60' : darkMode ? 'border-gray-700' : 'border-gray-200'
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+            {machine.type === 'washer' ? 'Washer' : 'Dryer'} #{machine.id}
+          </span>
+          <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
+            <QrCode className="w-3 h-3" />
+            {machine.qrCode}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+            machine.status === 'available' && machine.enabled
+              ? darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-700'
+              : machine.status === 'in-use'
+              ? darkMode ? 'bg-orange-900 text-orange-200' : 'bg-orange-100 text-orange-700'
+              : machine.status === 'completed'
+              ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
+              : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
+          }`}>
+            {machine.status === 'disabled' ? 'Disabled' : 
+             machine.status === 'available' ? 'Available' : 
+             machine.status === 'completed' ? 'Done' : 'In Use'}
+          </span>
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => onToggleAvailability(machine.id)}
+                className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onShowMaintenance(machine)}
+                className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800`}
+              >
+                <Wrench className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+          <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
+          {machine.issues.length > 0 && (
+            <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
+          )}
+        </div>
+      )}
+
+      {machine.status === 'in-use' && (
+        <div className="mb-4">
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+            <Clock className="w-4 h-4" />
+            <span>{formatTime(machine.timeLeft)} remaining</span>
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+            User: {machine.currentUser?.name}
+          </div>
+          {user.studentId === machine.currentUser?.studentId && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onCancel(machine.id)}
+                className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
+              >
+                Cancel
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => onEndCycle(machine.id)}
+                  className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
+                >
+                  End Now
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {machine.status === 'completed' && (
+        <div className="space-y-2">
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2`}>
+            <CheckCircle className="w-4 h-4" />
+            <span>Cycle completed!</span>
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+            User: {machine.currentUser?.name}
+          </div>
+          {user.studentId === machine.currentUser?.studentId && (
+            <button
+              onClick={() => onCollected(machine.id)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition"
+            >
+              Clothes Collected
+            </button>
+          )}
+        </div>
+      )}
+
+      {machine.status === 'available' && machine.enabled && (
+        <div className="space-y-2">
+          {Object.entries(categories).map(([key, cat]) => (
+            <button
+              key={key}
+              onClick={() => onConfirmStart(machine, key)}
+              className={`w-full ${
+                machine.type === 'washer' 
+                  ? darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+                  : darkMode ? 'bg-purple-900 hover:bg-purple-800 text-purple-200' : 'bg-purple-50 hover:bg-purple-100 text-purple-700'
+              } py-2 rounded-lg text-sm font-medium transition`}
+            >
+              {cat.name} ({cat.time}min)
+            </button>
+          ))}
+        </div>
+      )}
+
+      {machine.status === 'disabled' && (
+        <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+          <AlertCircle className="w-4 h-4" />
+          <span>Machine temporarily unavailable</span>
         </div>
       )}
     </div>
