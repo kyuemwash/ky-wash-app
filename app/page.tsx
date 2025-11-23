@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Plus, X, LogOut, User, Clock, Droplet, Wind, Settings, AlertCircle, CheckCircle, QrCode, TrendingUp, Wrench, Moon, Sun } from 'lucide-react';
+import { Bell, Plus, X, LogOut, User, Clock, Droplet, Wind, Settings, AlertCircle, CheckCircle, TrendingUp, Wrench, Moon, Sun, Lock, Flag } from 'lucide-react';
 
 interface User {
-  name: string;
   studentId: string;
-  phone: string;
+  pin: string;
+  phoneNumber?: string;
 }
 
 interface Machine {
@@ -17,10 +17,17 @@ interface Machine {
   timeLeft: number;
   currentUser: User | null;
   enabled: boolean;
-  qrCode: string;
   totalCycles: number;
   lastMaintenance: string;
   issues: string[];
+  faultReports: FaultReport[];
+}
+
+interface FaultReport {
+  id: string;
+  studentId: string;
+  issue: string;
+  timestamp: string;
 }
 
 interface WaitlistItem extends User {
@@ -47,156 +54,348 @@ interface UsageHistory {
   duration: number;
 }
 
+const ADMIN_PASSWORD = "admin123";
+
+// Simulated Supabase - Replace with actual Supabase client
+const useRealtimeDatabase = () => {
+  const [data, setData] = useState<any>(null);
+  
+  // Simulate real-time updates
+  useEffect(() => {
+    const stored = localStorage.getItem('kywash_db');
+    if (stored) {
+      setData(JSON.parse(stored));
+    } else {
+      const initialData = {
+        machines: [
+          { id: 1, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 245, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
+          { id: 2, type: 'washer', status: 'disabled', category: 'normal', timeLeft: 0, currentUser: null, enabled: false, totalCycles: 189, lastMaintenance: '2024-11-10', issues: ['Motor issue', 'Needs repair'], faultReports: [] },
+          { id: 3, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 312, lastMaintenance: '2024-11-18', issues: [], faultReports: [] },
+          { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 278, lastMaintenance: '2024-11-12', issues: [], faultReports: [] },
+          { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 401, lastMaintenance: '2024-11-16', issues: [], faultReports: [] },
+          { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 156, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
+          { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
+          { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
+          { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
+          { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
+          { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
+          { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
+        ],
+        washerWaitlist: [],
+        dryerWaitlist: [],
+        usageHistory: [],
+        notifications: [],
+        lastUpdate: Date.now(),
+      };
+      setData(initialData);
+      localStorage.setItem('kywash_db', JSON.stringify(initialData));
+    }
+
+    // Simulate real-time listener
+    const interval = setInterval(() => {
+      const stored = localStorage.getItem('kywash_db');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setData(parsed);
+      }
+    }, 500); // Check for updates every 500ms
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const updateData = (newData: any) => {
+    const updated = { ...newData, lastUpdate: Date.now() };
+    setData(updated);
+    localStorage.setItem('kywash_db', JSON.stringify(updated));
+    
+    // Broadcast to other tabs
+    localStorage.setItem('kywash_broadcast', JSON.stringify({ data: updated, timestamp: Date.now() }));
+  };
+
+  return { data, updateData };
+};
+
 const KYWash = () => {
+  const { data: sharedState, updateData } = useRealtimeDatabase();
   const [user, setUser] = useState<User | null>(null);
-  const [showAuth, setShowAuth] = useState(true);
-  const [authMode, setAuthMode] = useState('login');
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminAuth, setShowAdminAuth] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
   const [darkMode, setDarkMode] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
-  const [qrInput, setQrInput] = useState('');
-  const [machines, setMachines] = useState<Machine[]>([
-    { id: 1, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-001', totalCycles: 245, lastMaintenance: '2024-11-15', issues: [] },
-    { id: 2, type: 'washer', status: 'disabled', category: 'normal', timeLeft: 0, currentUser: null, enabled: false, qrCode: 'WASH-002', totalCycles: 189, lastMaintenance: '2024-11-10', issues: ['Motor issue', 'Needs repair'] },
-    { id: 3, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-003', totalCycles: 312, lastMaintenance: '2024-11-18', issues: [] },
-    { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-004', totalCycles: 278, lastMaintenance: '2024-11-12', issues: [] },
-    { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-005', totalCycles: 401, lastMaintenance: '2024-11-16', issues: [] },
-    { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-006', totalCycles: 156, lastMaintenance: '2024-11-19', issues: [] },
-    { id: 1, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-001', totalCycles: 334, lastMaintenance: '2024-11-14', issues: [] },
-    { id: 2, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-002', totalCycles: 289, lastMaintenance: '2024-11-17', issues: [] },
-    { id: 3, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-003', totalCycles: 267, lastMaintenance: '2024-11-13', issues: [] },
-    { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-004', totalCycles: 412, lastMaintenance: '2024-11-11', issues: [] },
-    { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-005', totalCycles: 198, lastMaintenance: '2024-11-19', issues: [] },
-    { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-006', totalCycles: 223, lastMaintenance: '2024-11-15', issues: [] },
-  ]);
-  const [washerWaitlist, setWasherWaitlist] = useState<WaitlistItem[]>([]);
-  const [dryerWaitlist, setDryerWaitlist] = useState<WaitlistItem[]>([]);
-  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
-  const [selectedMachineType, setSelectedMachineType] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [confirmModal, setConfirmModal] = useState<{ machine: Machine; category: string } | null>(null);
-  const [formData, setFormData] = useState({ name: '', studentId: '', phone: '' });
+  const [formData, setFormData] = useState({ studentId: '', pin: '', phoneNumber: '' });
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [maintenanceNote, setMaintenanceNote] = useState('');
-  const [usageHistory, setUsageHistory] = useState<UsageHistory[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [selectedMachineType, setSelectedMachineType] = useState<string | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ machine: Machine; category: string } | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportMachine, setReportMachine] = useState<Machine | null>(null);
+  const [reportIssue, setReportIssue] = useState('');
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   const washCategories = {
+    quick: { name: 'Quick Wash', time: 15 },
     normal: { name: 'Normal', time: 30 },
-    extra: { name: 'Extra Wash', time: 35 },
-    extrawash: { name: 'Extra Wash', time: 40 },
-    extraextrawash: { name: 'Extra Wash', time: 45 },
+    heavy: { name: 'Heavy Duty', time: 45 },
   };
 
-const dryCategories = {
-    normal: { name: 'Normal', time: 30 },
-    extra: { name: 'Extra Dry', time: 35 },
-    extradry: { name: 'Extra Dry', time: 40 },
-    extraextradry: { name: 'Extra Dry', time: 45 },
+  const dryCategories = {
+    quick: { name: 'Quick Dry', time: 20 },
+    normal: { name: 'Normal', time: 40 },
+    heavy: { name: 'Heavy Dry', time: 60 },
   };
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setMachines(prev => prev.map(m => {
-        if (m.status === 'in-use' && m.timeLeft > 0) {
-          const newTime = m.timeLeft - 1;
-          if (newTime === 0) {
-            if (m.currentUser) addNotification(m.currentUser, m.type, m.id);
-            logUsage(m);
-            return { ...m, status: 'completed', timeLeft: 0, totalCycles: m.totalCycles + 1 };
-          }
-          return { ...m, timeLeft: newTime };
-        }
-        return m;
-      }));
-    }, 1000);
-    return () => clearInterval(timer);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
   }, []);
 
+  // Timer for machine countdowns - more efficient implementation
+  useEffect(() => {
+    if (!sharedState?.machines) return;
+
+    // Check if any machine is currently running
+    const hasRunningMachines = sharedState.machines.some((m: Machine) => m.status === 'in-use' && m.timeLeft > 0);
+    if (!hasRunningMachines) return; // No need for timer if nothing is running
+
+    const timer = setInterval(() => {
+      // Get fresh data from localStorage to avoid stale closure
+      const stored = localStorage.getItem('kywash_db');
+      if (!stored) return;
+
+      try {
+        const currentData = JSON.parse(stored);
+        const updatedMachines = currentData.machines.map((m: Machine) => {
+          if (m.status === 'in-use' && m.timeLeft > 0) {
+            const newTime = m.timeLeft - 1;
+            if (newTime === 0) {
+              // Machine cycle completed
+              if (m.currentUser) {
+                sendPushNotification(m.currentUser, m.type, m.id);
+                logUsage(m);
+              }
+              return { 
+                ...m, 
+                status: 'completed', 
+                timeLeft: 0, 
+                totalCycles: m.totalCycles + 1 
+              };
+            }
+            // Machine still running, decrement time
+            return { ...m, timeLeft: newTime };
+          }
+          return m;
+        });
+
+        // Check if any machine actually changed
+        let machinesChanged = false;
+        for (let i = 0; i < updatedMachines.length; i++) {
+          if (updatedMachines[i].timeLeft !== currentData.machines[i].timeLeft ||
+              updatedMachines[i].status !== currentData.machines[i].status) {
+            machinesChanged = true;
+            break;
+          }
+        }
+
+        if (machinesChanged) {
+          updateData({ ...currentData, machines: updatedMachines });
+        }
+      } catch (e) {
+        console.error('Timer update error:', e);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [sharedState?.machines?.length]); // Only re-run if machine count changes
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+        if (permission === 'granted') {
+          new Notification('KY Wash', {
+            body: 'Notifications enabled! You will be alerted when your cycle completes.',
+            icon: '/laundry-icon.png'
+          });
+        }
+      }
+    }
+  };
+
+  const sendPushNotification = (userData: User, type: string, machineId: number) => {
+    if (!userData) return;
+    const message = `Student ${userData.studentId}, your ${type} #${machineId} is done!`;
+
+    const notif = {
+      id: Date.now(),
+      user: userData,
+      type,
+      machineId,
+      timestamp: new Date().toLocaleTimeString(),
+      message,
+    };
+
+    if (sharedState) {
+      updateData({
+        ...sharedState,
+        notifications: [...sharedState.notifications, notif]
+      });
+    }
+
+    // Browser notification
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('KY Wash - Cycle Complete! 🎉', {
+          body: message,
+          icon: '/laundry-icon.png',
+          badge: '/laundry-icon.png',
+          requireInteraction: true,
+          tag: `machine-${machineId}`
+        });
+        
+        // Play notification sound
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUKnn77RiGwU7k9ryynkqBSh+zPLaizsKGGS76+miUhIIQ5zd8sFuJAUvgs/y2Ik3CBtpu+3mn04MClCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBACg==');
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      } catch {}
+    }
+
+    // Simulate SMS notification (in production, use Twilio)
+    console.log(`📱 SMS sent to ${userData.studentId}: ${message}`);
+  };
+
   const logUsage = (machine: Machine) => {
+    if (!sharedState) return;
+
     const usage = {
       id: Date.now(),
       machineId: machine.id,
       machineType: machine.type,
-      user: machine.currentUser?.name || 'Unknown',
+      user: machine.currentUser?.studentId || 'Unknown',
       category: machine.category,
-      timestamp: new Date().toISOString(), // store ISO for reliable parsing
+      timestamp: new Date().toISOString(),
       duration: machine.type === 'washer' ? washCategories[machine.category as keyof typeof washCategories].time : dryCategories[machine.category as keyof typeof dryCategories].time,
     };
-    setUsageHistory(prev => [...prev, usage]);
-  };
 
-  const addNotification = (userData: User, type: string, machineId: number) => {
-    if (!userData) return;
-
-const message = `${userData.name}, your ${type} #${machineId} is done!`;
-
-const notif = {
-  id: Date.now(),
-  user: userData,
-  type,
-  machineId,
-  timestamp: new Date().toLocaleTimeString(),
-  message,
-};
-
-setNotifications(prev => [...prev, notif]);
-
-    // client-safe guard
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification('KY Wash', {
-          body: notif.message,
-          icon: '/laundry-icon.png'
-        });
-      } catch {
-        // ignore notification errors in non-secure contexts
-      }
-    }
-  };
-
-  const requestNotificationPermission = () => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      try {
-        Notification.requestPermission();
-      } catch {
-        // ignore
-      }
-    }
+    updateData({
+      ...sharedState,
+      usageHistory: [...sharedState.usageHistory, usage]
+    });
   };
 
   const handleAuth = () => {
-    if (formData.name && formData.studentId && formData.phone) {
-      const userData = { ...formData };
-      setUser(userData);
-      setIsAdmin(formData.studentId.toUpperCase() === 'ADMIN');
+    if (!formData.studentId || !formData.pin || formData.studentId.length !== 6 || formData.pin.length < 4) {
+      alert('Please enter a valid 6-digit Student ID and 4-digit PIN');
+      return;
+    }
+    
+    if (authMode === 'register' && (!formData.phoneNumber || formData.phoneNumber.length < 10)) {
+      alert('Please enter a valid phone number (at least 10 digits)');
+      return;
+    }
+
+    // Get registered users from localStorage
+    const registeredUsersStr = localStorage.getItem('kywash_users');
+    const registeredUsers: User[] = registeredUsersStr ? JSON.parse(registeredUsersStr) : [];
+
+    if (authMode === 'register') {
+      // Check if user already exists
+      const existingUser = registeredUsers.find(u => u.studentId === formData.studentId);
+      if (existingUser) {
+        alert('This Student ID is already registered! Please login instead.');
+        setAuthMode('login');
+        return;
+      }
+
+      // Register new user
+      const newUser = { studentId: formData.studentId, pin: formData.pin, phoneNumber: formData.phoneNumber };
+      registeredUsers.push(newUser);
+      localStorage.setItem('kywash_users', JSON.stringify(registeredUsers));
+      
+      setUser(newUser);
       setShowAuth(false);
+      setFormData({ studentId: '', pin: '', phoneNumber: '' });
+      requestNotificationPermission();
+      alert('Registration successful! You can now use KY Wash.');
+    } else {
+      // Login existing user
+      const existingUser = registeredUsers.find(u => u.studentId === formData.studentId && u.pin === formData.pin);
+      
+      if (!existingUser) {
+        alert('Invalid credentials! Please check your Student ID and PIN, or register if you are a new user.');
+        return;
+      }
+
+      setUser(existingUser);
+      setShowAuth(false);
+      setFormData({ studentId: '', pin: '', phoneNumber: '' });
       requestNotificationPermission();
     }
   };
 
-  const handleQRScan = () => {
-    const code = qrInput.trim().toUpperCase();
-    const machine = machines.find(m => m.qrCode === code);
-    if (machine) {
-      setSelectedMachine(machine);
-      setShowQRScanner(false);
-      setQrInput('');
-      if (typeof document !== 'undefined') {
-        document.getElementById(`machine-${machine.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+  const handleAdminAuth = () => {
+    if (adminPassword === ADMIN_PASSWORD) {
+      setIsAdmin(true);
+      setShowAdminAuth(false);
+      setAdminPassword('');
     } else {
-      alert('Invalid QR code! Please scan a valid machine QR code.');
+      alert('Incorrect password!');
+      setAdminPassword('');
     }
   };
 
+  const handleReportFault = () => {
+    if (!reportMachine || !reportIssue.trim() || !user) return;
+
+    const newReport: FaultReport = {
+      id: `${Date.now()}`,
+      studentId: user.studentId,
+      issue: reportIssue.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedMachines = sharedState.machines.map((m: Machine) => {
+      if (m.id === reportMachine.id) {
+        const newReports = [...m.faultReports, newReport];
+        
+        // Auto-disable after 3 reports
+        if (newReports.length >= 3 && m.enabled) {
+          return {
+            ...m,
+            faultReports: newReports,
+            enabled: false,
+            status: 'disabled',
+            issues: [...m.issues, `Auto-disabled: ${newReports.length} fault reports`]
+          };
+        }
+        return { ...m, faultReports: newReports };
+      }
+      return m;
+    });
+
+    updateData({ ...sharedState, machines: updatedMachines });
+    setReportIssue('');
+    setShowReportModal(false);
+    setReportMachine(null);
+    alert('Fault reported successfully! Admin will be notified.');
+  };
+
   const handleConfirmStart = (machine: Machine, category: string) => {
+    if (!user) {
+      setShowAuth(true);
+      return;
+    }
     setConfirmModal({ machine, category });
   };
 
   const handleStartMachine = () => {
-    if (!confirmModal || !user) return;
+    if (!confirmModal || !user || !sharedState) return;
     const { machine, category } = confirmModal;
     if (machine.status !== 'available' || !machine.enabled) {
       setConfirmModal(null);
@@ -211,76 +410,91 @@ setNotifications(prev => [...prev, notif]);
     }
     const time = cycle.time * 60;
 
-    setMachines(prev => prev.map(m =>
+    const updatedMachines = sharedState.machines.map((m: Machine) =>
       m.id === machine.id
         ? { ...m, status: 'in-use', category, timeLeft: time, currentUser: user }
         : m
-    ));
+    );
+
+    updateData({ ...sharedState, machines: updatedMachines });
     setConfirmModal(null);
     setSelectedMachine(null);
   };
 
   const handleCancelMachine = (machineId: number) => {
-    setMachines(prev => prev.map(m =>
+    if (!sharedState) return;
+    const updatedMachines = sharedState.machines.map((m: Machine) =>
       m.id === machineId
         ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
         : m
-    ));
+    );
+    updateData({ ...sharedState, machines: updatedMachines });
   };
 
-const handleEndCycle = (machineId: number) => {
-    const machine = machines.find(m => m.id === machineId);
-    if (machine) {
-      logUsage(machine);
-    }
-    setMachines(prev => prev.map(m =>
+  const handleEndCycle = (machineId: number) => {
+    if (!sharedState) return;
+    const machine = sharedState.machines.find((m: Machine) => m.id === machineId);
+    if (machine) logUsage(machine);
+    
+    const updatedMachines = sharedState.machines.map((m: Machine) =>
       m.id === machineId
         ? { ...m, status: 'completed', timeLeft: 0, totalCycles: m.totalCycles + 1 }
         : m
-    ));
+    );
+    updateData({ ...sharedState, machines: updatedMachines });
   };
 
   const handleClothesCollected = (machineId: number) => {
-    setMachines(prev => prev.map(m =>
+    if (!sharedState) return;
+    
+    const machine = sharedState.machines.find((m: Machine) => m.id === machineId);
+    if (!machine) return;
+    
+    const waitlist = machine.type === 'washer' ? sharedState.washerWaitlist : sharedState.dryerWaitlist;
+    if (waitlist.length > 0) {
+      alert(`Attention: ${machine.type} #${machineId} is now available for the next person in line!`);
+    }
+
+    const updatedMachines = sharedState.machines.map((m: Machine) =>
       m.id === machineId
         ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
         : m
-    ));
+    );
 
-    const machine = machines.find(m => m.id === machineId);
-    if (!machine) return;
-    const waitlist = machine.type === 'washer' ? washerWaitlist : dryerWaitlist;
-    if (waitlist.length > 0) {
-      alert(`Attention: ${machine.type} #${machineId} is now available!`);
-    }
+    updateData({ ...sharedState, machines: updatedMachines });
   };
 
   const handleJoinWaitlist = (type: string) => {
-    if (!user) return;
+    if (!user || !sharedState) {
+      setShowAuth(true);
+      return;
+    }
     const newItem = {
       id: Date.now(),
       ...user,
       timestamp: new Date().toLocaleTimeString(),
     };
 
-    if (type === 'washer') {
-      setWasherWaitlist(prev => [...prev, newItem]);
-    } else {
-      setDryerWaitlist(prev => [...prev, newItem]);
-    }
+    updateData({
+      ...sharedState,
+      washerWaitlist: type === 'washer' ? [...sharedState.washerWaitlist, newItem] : sharedState.washerWaitlist,
+      dryerWaitlist: type === 'dryer' ? [...sharedState.dryerWaitlist, newItem] : sharedState.dryerWaitlist,
+    });
     setShowWaitlistModal(false);
   };
 
   const handleLeaveWaitlist = (type: string, itemId: number) => {
-    if (type === 'washer') {
-      setWasherWaitlist(prev => prev.filter(item => item.id !== itemId));
-    } else {
-      setDryerWaitlist(prev => prev.filter(item => item.id !== itemId));
-    }
+    if (!sharedState) return;
+    updateData({
+      ...sharedState,
+      washerWaitlist: type === 'washer' ? sharedState.washerWaitlist.filter((item: WaitlistItem) => item.id !== itemId) : sharedState.washerWaitlist,
+      dryerWaitlist: type === 'dryer' ? sharedState.dryerWaitlist.filter((item: WaitlistItem) => item.id !== itemId) : sharedState.dryerWaitlist,
+    });
   };
 
   const toggleMachineAvailability = (machineId: number) => {
-    setMachines(prev => prev.map(m => {
+    if (!sharedState) return;
+    const updatedMachines = sharedState.machines.map((m: Machine) => {
       if (m.id === machineId) {
         const newEnabled = !m.enabled;
         return {
@@ -292,22 +506,26 @@ const handleEndCycle = (machineId: number) => {
         };
       }
       return m;
-    }));
+    });
+    updateData({ ...sharedState, machines: updatedMachines });
   };
 
   const handleAddMaintenanceNote = () => {
-    if (!maintenanceNote.trim() || !selectedMachine) return;
-    setMachines(prev => prev.map(m => {
+    if (!maintenanceNote.trim() || !selectedMachine || !sharedState) return;
+    
+    const updatedMachines = sharedState.machines.map((m: Machine) => {
       if (m.id === selectedMachine.id) {
         return {
           ...m,
           issues: [...m.issues, maintenanceNote.trim()],
-          lastMaintenance: new Date().toISOString().split('T')[0]
+          lastMaintenance: new Date().toISOString().split('T')[0],
+          faultReports: [] // Clear fault reports after maintenance
         };
       }
       return m;
-    }));
+    });
 
+    updateData({ ...sharedState, machines: updatedMachines });
     setMaintenanceNote('');
     setShowMaintenanceModal(false);
   };
@@ -318,18 +536,27 @@ const handleEndCycle = (machineId: number) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getUserInfo = (studentId: string) => {
+    const registeredUsersStr = localStorage.getItem('kywash_users');
+    const registeredUsers: User[] = registeredUsersStr ? JSON.parse(registeredUsersStr) : [];
+    const userInfo = registeredUsers.find(u => u.studentId === studentId);
+    return userInfo;
+  };
+
   const getAvailableCount = (type: string) => {
-    return machines.filter(m => m.type === type && m.status === 'available' && m.enabled).length;
+    if (!sharedState) return 0;
+    return sharedState.machines.filter((m: Machine) => m.type === type && m.status === 'available' && m.enabled).length;
   };
 
   const getTotalCount = (type: string) => {
-    return machines.filter(m => m.type === type && m.enabled).length;
+    if (!sharedState) return 0;
+    return sharedState.machines.filter((m: Machine) => m.type === type && m.enabled).length;
   };
 
   const getPeakHours = () => {
+    if (!sharedState) return 'No data yet';
     const hours: { [key: number]: number } = {};
-    usageHistory.forEach(u => {
-      // timestamp stored as ISO; safe to parse
+    sharedState.usageHistory.forEach((u: UsageHistory) => {
       const d = new Date(u.timestamp);
       const hour = isNaN(d.getTime()) ? null : d.getHours();
       if (hour !== null) {
@@ -341,15 +568,76 @@ const handleEndCycle = (machineId: number) => {
   };
 
   const getMostUsedCategory = () => {
+    if (!sharedState) return 'No data yet';
     const categories: { [key: string]: number } = {};
-    usageHistory.forEach(u => {
+    sharedState.usageHistory.forEach((u: UsageHistory) => {
       categories[u.category] = (categories[u.category] || 0) + 1;
     });
     const sorted = Object.entries(categories).sort((a, b) => (b[1] as number) - (a[1] as number));
     return sorted[0]?.[0] || 'No data yet';
   };
 
-  if (showAuth) {
+  if (!sharedState) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Droplet className="w-16 h-16 text-blue-600 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600">Loading KY Wash...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showAdminAuth) {
+    return (
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'} flex items-center justify-center p-4`}>
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 w-full max-w-md`}>
+          <div className="text-center mb-8">
+            <div className={`inline-block p-3 ${darkMode ? 'bg-orange-900' : 'bg-orange-100'} rounded-full mb-4`}>
+              <Lock className={`w-8 h-8 ${darkMode ? 'text-orange-400' : 'text-orange-600'}`} />
+            </div>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Admin Access</h1>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} mt-2`}>Enter admin password to continue</p>
+          </div>
+
+          <div className="space-y-4">
+            <input
+              type="password"
+              placeholder="Admin Password"
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent`}
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdminAuth()}
+            />
+            <button
+              onClick={handleAdminAuth}
+              className="w-full bg-orange-600 text-white py-3 rounded-lg font-medium hover:bg-orange-700 transition"
+            >
+              Login as Admin
+            </button>
+            <button
+              onClick={() => setShowAdminAuth(false)}
+              className={`w-full ${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-black'} py-3 rounded-lg font-medium hover:bg-gray-200 transition`}
+            >
+              Back to Main
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sharedState) {
+    return (
+      <div className={`flex items-center justify-center min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="text-center">
+          <p className={`text-xl font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || showAuth) {
     return (
       <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'} flex items-center justify-center p-4`}>
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 w-full max-w-md`}>
@@ -357,8 +645,8 @@ const handleEndCycle = (machineId: number) => {
             <div className={`inline-block p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-full mb-4`}>
               <Droplet className={`w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
             </div>
-            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>KY Wash</h1>
-            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2`}>Smart Laundry Management System</p>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>KY Wash</h1>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} mt-2`}>Laundry Management System</p>
           </div>
 
           <div className="flex gap-2 mb-6">
@@ -387,25 +675,31 @@ const handleEndCycle = (machineId: number) => {
           <div className="space-y-4">
             <input
               type="text"
-              placeholder="Full Name"
-              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-            />
-            <input
-              type="text"
-              placeholder="Student ID (Use 'ADMIN' for admin access)"
-              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              placeholder="Student ID (6 digits)"
+              maxLength={6}
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               value={formData.studentId}
-              onChange={(e) => setFormData({...formData, studentId: e.target.value})}
+              onChange={(e) => setFormData({...formData, studentId: e.target.value.replace(/\D/g, '')})}
             />
             <input
-              type="tel"
-              placeholder="Phone Number"
-              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-              value={formData.phone}
-              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+              type="password"
+              placeholder="PIN (4 digits)"
+              maxLength={4}
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+              value={formData.pin}
+              onChange={(e) => setFormData({...formData, pin: e.target.value})}
+              onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
             />
+            {authMode === 'register' && (
+              <input
+                type="tel"
+                placeholder="Phone Number (for communication)"
+                className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({...formData, phoneNumber: e.target.value.replace(/\D/g, '')})}
+                onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+              />
+            )}
             <button
               onClick={handleAuth}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition"
@@ -429,22 +723,24 @@ const handleEndCycle = (machineId: number) => {
   return (
     <>
       <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-sm border-b sticky top-0 z-40`}>
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <Droplet className={`w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
             <div>
-              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>KY Wash</h1>
+              <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>KY Wash</h1>
               {isAdmin && <span className="text-xs text-orange-600 font-medium">Admin Mode</span>}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowQRScanner(true)}
-              className="text-blue-600 hover:text-blue-700"
-              title="Scan QR Code"
-            >
-              <QrCode className="w-6 h-6" />
-            </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {notificationPermission === 'default' && user && (
+              <button
+                onClick={requestNotificationPermission}
+                className="bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs font-medium hover:bg-yellow-600 transition flex items-center gap-1"
+              >
+                <Bell className="w-3 h-3" />
+                Enable Alerts
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => setShowAnalytics(true)}
@@ -452,6 +748,15 @@ const handleEndCycle = (machineId: number) => {
                 title="View Analytics"
               >
                 <TrendingUp className="w-6 h-6" />
+              </button>
+            )}
+            {!isAdmin && (
+              <button
+                onClick={() => setShowAdminAuth(true)}
+                className="text-orange-600 hover:text-orange-700"
+                title="Admin Login"
+              >
+                <Lock className="w-6 h-6" />
               </button>
             )}
             <button
@@ -462,279 +767,264 @@ const handleEndCycle = (machineId: number) => {
             </button>
             <div className="relative">
               <Bell className={`w-6 h-6 ${darkMode ? 'text-gray-400' : 'text-gray-600'} cursor-pointer hover:text-blue-600 transition`} />
-              {notifications.length > 0 && (
+              {sharedState.notifications.length > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {notifications.length}
+                  {sharedState.notifications.length}
                 </span>
               )}
             </div>
-            {user && (
-              <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                <User className="w-4 h-4" />
-                <span>{user.name}</span>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setUser(null);
-                setShowAuth(true);
-                setIsAdmin(false);
-              }}
-              className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800 transition`}
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-6">
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
-          <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
-        </div>
-        <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
-      </div>
-    </div>
-    <div className={`${darkMode ? 'bg-purple-900 border-purple-800' : 'bg-purple-50 border-purple-100'} rounded-xl p-4 border`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-600'} font-medium`}>Dryers</p>
-          <p className={`text-3xl font-bold ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>{getAvailableCount('dryer')}/{getTotalCount('dryer')}</p>
-        </div>
-        <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
-      </div>
-    </div>
-    <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
-          <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{washerWaitlist.length}</p>
-        </div>
-        <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
-      </div>
-    </div>
-    <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'} font-medium`}>Dryer Waitlist</p>
-          <p className={`text-3xl font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>{dryerWaitlist.length}</p>
-        </div>
-        <Clock className={`w-10 h-10 ${darkMode ? 'text-pink-400' : 'text-pink-400'}`} />
-      </div>
-    </div>
-  </div>
-
-  {notifications.length > 0 && (
-    <div className={`mb-6 ${darkMode ? 'bg-yellow-900 border-yellow-800' : 'bg-yellow-50 border-yellow-200'} border rounded-xl p-4`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className={`font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-800'} flex items-center gap-2`}>
-          <Bell className="w-5 h-5" />
-          Recent Notifications
-        </h3>
-        <button
-          onClick={() => setNotifications([])}
-          className={`${darkMode ? 'text-yellow-400 hover:text-yellow-200' : 'text-yellow-700 hover:text-yellow-900'} text-sm`}
-        >
-          Clear All
-        </button>
-      </div>
-      <div className="space-y-2">
-        {notifications.slice(-3).reverse().map(notif => (
-          <div key={notif.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-3 text-sm`}>
-            <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{notif.message}</p>
-            <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mt-1`}>{notif.timestamp}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )}
-
-  <div className="space-y-6">
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Washing Machines</h2>
-        <button
-          onClick={() => {
-            setSelectedMachineType('washer');
-            setShowWaitlistModal(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Join Waitlist
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {machines.filter(m => m.type === 'washer').map(machine => (
-          <MachineCard
-            key={machine.id}
-            machine={machine}
-            darkMode={darkMode}
-            selectedMachine={selectedMachine}
-            isAdmin={isAdmin}
-            user={user}
-            categories={washCategories}
-            onConfirmStart={handleConfirmStart}
-            onCancel={handleCancelMachine}
-            onEndCycle={handleEndCycle}
-            onCollected={handleClothesCollected}
-            onToggleAvailability={toggleMachineAvailability}
-            onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
-            formatTime={formatTime}
-          />
-        ))}
-      </div>
-    </div>
-
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Dryers</h2>
-        <button
-          onClick={() => {
-            setSelectedMachineType('dryer');
-            setShowWaitlistModal(true);
-          }}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Join Waitlist
-        </button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {machines.filter(m => m.type === 'dryer').map(machine => (
-          <MachineCard
-            key={machine.id}
-            machine={machine}
-            darkMode={darkMode}
-            selectedMachine={selectedMachine}
-            isAdmin={isAdmin}
-            user={user}
-            categories={dryCategories}
-            onConfirmStart={handleConfirmStart}
-            onCancel={handleCancelMachine}
-            onEndCycle={handleEndCycle}
-            onCollected={handleClothesCollected}
-            onToggleAvailability={toggleMachineAvailability}
-            onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
-            formatTime={formatTime}
-          />
-        ))}
-      </div>
-    </div>
-  </div>
-
-  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-    <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
-      <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Washer Waitlist</h3>
-      {washerWaitlist.length === 0 ? (
-        <p className={`${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No one waiting</p>
-      ) : (
-        <div className="space-y-2">
-          {washerWaitlist.map((item) => (
-            <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
-              <div>
-                <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.name}</p>
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.phone}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{item.timestamp}</span>
-                {(user && (user.studentId === item.studentId || isAdmin)) && (
-                  <button
-                    onClick={() => handleLeaveWaitlist('washer', item.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-
-    <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
-      <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Dryer Waitlist</h3>
-      {dryerWaitlist.length === 0 ? (
-        <p className={`${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No one waiting</p>
-      ) : (
-        <div className="space-y-2">
-          {dryerWaitlist.map((item) => (
-            <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
-              <div>
-                <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>{item.name}</p>
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.phone}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{item.timestamp}</span>
-                {(user && (user.studentId === item.studentId || isAdmin)) && (
-                  <button
-                    onClick={() => handleLeaveWaitlist('dryer', item.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-
-      {showQRScanner && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Scan QR Code</h3>
-              <button onClick={() => setShowQRScanner(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
-                <X className="w-6 h-6" />
+            {user ? (
+              <>
+                <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-black'}`}>
+                  <User className="w-4 h-4" />
+                  <span>ID: {user.studentId}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setUser(null);
+                    setIsAdmin(false);
+                  }}
+                  className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} hover:text-gray-800 transition`}
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              >
+                Login
               </button>
-            </div>
-            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>Enter the QR code from the machine</p>
-            <input
-              type="text"
-              placeholder="e.g., WASH-001 or DRY-003"
-              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
-              value={qrInput}
-              onChange={(e) => setQrInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleQRScan()}
-            />
-            <button
-              onClick={handleQRScan}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
-            >
-              Find Machine
-            </button>
+            )}
           </div>
         </div>
-      )}
+      </div>
+
+      <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
+                </div>
+                <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
+              </div>
+            </div>
+            <div className={`${darkMode ? 'bg-purple-900 border-purple-800' : 'bg-purple-50 border-purple-100'} rounded-xl p-4 border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-600'} font-medium`}>Dryers</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>{getAvailableCount('dryer')}/{getTotalCount('dryer')}</p>
+                </div>
+                <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
+              </div>
+            </div>
+            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{sharedState.washerWaitlist.length}</p>
+                </div>
+                <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
+              </div>
+            </div>
+            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'} font-medium`}>Dryer Waitlist</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>{sharedState.dryerWaitlist.length}</p>
+                </div>
+                <Clock className={`w-10 h-10 ${darkMode ? 'text-pink-400' : 'text-pink-400'}`} />
+              </div>
+            </div>
+          </div>
+
+          {sharedState.notifications.length > 0 && (
+            <div className={`mb-6 ${darkMode ? 'bg-yellow-900 border-yellow-800' : 'bg-yellow-50 border-yellow-200'} border rounded-xl p-4`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`font-semibold ${darkMode ? 'text-yellow-300' : 'text-yellow-800'} flex items-center gap-2`}>
+                  <Bell className="w-5 h-5" />
+                  Recent Notifications
+                </h3>
+                <button
+                  onClick={() => updateData({ ...sharedState, notifications: [] })}
+                  className={`${darkMode ? 'text-yellow-400 hover:text-yellow-200' : 'text-yellow-700 hover:text-yellow-900'} text-sm`}
+                >
+                  Clear All
+                </button>
+              </div>
+              <div className="space-y-2">
+                {sharedState.notifications.slice(-3).reverse().map((notif: Notification) => (
+                  <div key={notif.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-3 text-sm`}>
+                    <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>{notif.message}</p>
+                    <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'} mt-1`}>{notif.timestamp}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Washing Machines</h2>
+                <button
+                  onClick={() => {
+                    setSelectedMachineType('washer');
+                    setShowWaitlistModal(true);
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Join Waitlist
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((machine: Machine) => (
+                  <MachineCard
+                    key={machine.id}
+                    machine={machine}
+                    darkMode={darkMode}
+                    selectedMachine={selectedMachine}
+                    isAdmin={isAdmin}
+                    user={user}
+                    categories={washCategories}
+                    onConfirmStart={handleConfirmStart}
+                    onCancel={handleCancelMachine}
+                    onEndCycle={handleEndCycle}
+                    onCollected={handleClothesCollected}
+                    onToggleAvailability={toggleMachineAvailability}
+                    onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                    onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
+                    formatTime={formatTime}
+                    getUserInfo={getUserInfo}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Dryers</h2>
+                <button
+                  onClick={() => {
+                    setSelectedMachineType('dryer');
+                    setShowWaitlistModal(true);
+                  }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Join Waitlist
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sharedState.machines.filter((m: Machine) => m.type === 'dryer').map((machine: Machine) => (
+                  <MachineCard
+                    key={machine.id}
+                    machine={machine}
+                    darkMode={darkMode}
+                    selectedMachine={selectedMachine}
+                    isAdmin={isAdmin}
+                    user={user}
+                    categories={dryCategories}
+                    onConfirmStart={handleConfirmStart}
+                    onCancel={handleCancelMachine}
+                    onEndCycle={handleEndCycle}
+                    onCollected={handleClothesCollected}
+                    onToggleAvailability={toggleMachineAvailability}
+                    onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                    onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
+                    formatTime={formatTime}
+                    getUserInfo={getUserInfo}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-black'} mb-4`}>Washer Waitlist</h3>
+              {sharedState.washerWaitlist.length === 0 ? (
+                <p className={`${darkMode ? 'text-gray-500' : 'text-gray-600'} text-center py-4`}>No one waiting</p>
+              ) : (
+                <div className="space-y-2">
+                  {sharedState.washerWaitlist.map((item: WaitlistItem) => (
+                    <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
+                      <div>
+                        <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>Student ID: {item.studentId}</p>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.timestamp}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(user && (user.studentId === item.studentId || isAdmin)) && (
+                          <button
+                            onClick={() => handleLeaveWaitlist('washer', item.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-black'} mb-4`}>Dryer Waitlist</h3>
+              {sharedState.dryerWaitlist.length === 0 ? (
+                <p className={`${darkMode ? 'text-gray-500' : 'text-gray-600'} text-center py-4`}>No one waiting</p>
+              ) : (
+                <div className="space-y-2">
+                  {sharedState.dryerWaitlist.map((item: WaitlistItem) => (
+                    <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
+                      <div>
+                        <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>Student ID: {item.studentId}</p>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.timestamp}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {(user && (user.studentId === item.studentId || isAdmin)) && (
+                          <button
+                            onClick={() => handleLeaveWaitlist('dryer', item.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {showWaitlistModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Join Waitlist</h3>
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Join Waitlist</h3>
               <button onClick={() => setShowWaitlistModal(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
                 <X className="w-6 h-6" />
               </button>
             </div>
-            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>You will be notified when a machine becomes available</p>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} mb-4`}>You will be notified when a machine becomes available</p>
             <button
               onClick={() => selectedMachineType && handleJoinWaitlist(selectedMachineType)}
-              disabled={!selectedMachineType || !user}
+              disabled={!selectedMachineType}
               className={`w-full py-3 rounded-lg font-medium transition ${
                 selectedMachineType === 'washer'
                   ? 'bg-blue-600 hover:bg-blue-700 text-white'
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
-              {selectedMachineType ? `Join ${selectedMachineType === 'washer' ? 'Washer' : 'Dryer'} Waitlist` : 'Select a machine type first'}
+              {selectedMachineType ? `Join ${selectedMachineType === 'washer' ? 'Washer' : 'Dryer'} Waitlist` : 'Select a machine type'}
             </button>
           </div>
         </div>
@@ -744,33 +1034,32 @@ const handleEndCycle = (machineId: number) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Confirm Start</h3>
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Confirm Start</h3>
               <button onClick={() => setConfirmModal(null)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
                 <X className="w-6 h-6" />
               </button>
             </div>
             <div className="mb-6">
-              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+              <p className={`${darkMode ? 'text-gray-300' : 'text-black'} mb-2`}>
                 Start <strong>{confirmModal.machine.type} #{confirmModal.machine.id}</strong>
               </p>
-              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} text-sm`}>
                 Cycle: <strong>{confirmModal.machine.type === 'washer' ? washCategories[confirmModal.category as keyof typeof washCategories].name : dryCategories[confirmModal.category as keyof typeof dryCategories].name}</strong>
               </p>
-              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} text-sm`}>
                 Duration: <strong>{confirmModal.machine.type === 'washer' ? washCategories[confirmModal.category as keyof typeof washCategories].time : dryCategories[confirmModal.category as keyof typeof dryCategories].time} minutes</strong>
               </p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmModal(null)}
-                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} py-3 rounded-lg font-medium transition`}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
               >
                 Cancel
               </button>
               <button
                 onClick={handleStartMachine}
-                disabled={!user}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
               >
                 Confirm
               </button>
@@ -783,25 +1072,40 @@ const handleEndCycle = (machineId: number) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Maintenance Log</h3>
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Maintenance Log</h3>
               <button onClick={() => setShowMaintenanceModal(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
                 <X className="w-6 h-6" />
               </button>
             </div>
             <div className="mb-4">
-              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+              <p className={`${darkMode ? 'text-gray-300' : 'text-black'} mb-2`}>
                 <strong>{selectedMachine.type.toUpperCase()} #{selectedMachine.id}</strong>
               </p>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
                 Total Cycles: {selectedMachine.totalCycles}
               </p>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
                 Last Maintenance: {selectedMachine.lastMaintenance}
               </p>
             </div>
+            {selectedMachine.faultReports.length > 0 && (
+              <div className="mb-4">
+                <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-black'} mb-2`}>Fault Reports:</h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {selectedMachine.faultReports.map((report) => (
+                    <div key={report.id} className={`${darkMode ? 'bg-red-900' : 'bg-red-50'} rounded p-2`}>
+                      <p className={`text-sm ${darkMode ? 'text-red-200' : 'text-red-700'}`}>{report.issue}</p>
+                      <p className={`text-xs ${darkMode ? 'text-red-300' : 'text-red-600'} mt-1`}>
+                        By: {report.studentId} - {new Date(report.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {selectedMachine.issues.length > 0 && (
               <div className="mb-4">
-                <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Issue History:</h4>
+                <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-black'} mb-2`}>Maintenance History:</h4>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {selectedMachine.issues.map((issue, idx) => (
                     <p key={`${selectedMachine.id}-issue-${idx}`} className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
@@ -813,7 +1117,7 @@ const handleEndCycle = (machineId: number) => {
             )}
             <textarea
               placeholder="Add maintenance note..."
-              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4`}
               rows={3}
               value={maintenanceNote}
               onChange={(e) => setMaintenanceNote(e.target.value)}
@@ -822,7 +1126,7 @@ const handleEndCycle = (machineId: number) => {
               onClick={handleAddMaintenanceNote}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
             >
-              Add Note
+              Add Note & Clear Faults
             </button>
           </div>
         </div>
@@ -832,7 +1136,7 @@ const handleEndCycle = (machineId: number) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-2xl w-full my-8`}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Usage Analytics</h3>
+              <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Usage Analytics</h3>
               <button onClick={() => setShowAnalytics(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
                 <X className="w-6 h-6" />
               </button>
@@ -841,12 +1145,12 @@ const handleEndCycle = (machineId: number) => {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div className={`${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg p-4`}>
                 <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium mb-2`}>Total Cycles Today</p>
-                <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{usageHistory.length}</p>
+                <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{sharedState.usageHistory.length}</p>
               </div>
               <div className={`${darkMode ? 'bg-green-900' : 'bg-green-50'} rounded-lg p-4`}>
                 <p className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-600'} font-medium mb-2`}>Machines Active</p>
                 <p className={`text-3xl font-bold ${darkMode ? 'text-green-200' : 'text-green-700'}`}>
-                  {machines.filter(m => m.status === 'in-use').length}
+                  {sharedState.machines.filter((m: Machine) => m.status === 'in-use').length}
                 </p>
               </div>
               <div className={`${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg p-4`}>
@@ -860,17 +1164,16 @@ const handleEndCycle = (machineId: number) => {
             </div>
 
             <div className="mb-6">
-              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Machine Health</h4>
-
+              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-black'} mb-3`}>Machine Health</h4>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {machines.map(m => (
+                {sharedState.machines.map((m: Machine) => (
                   <div key={m.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
                     <div>
-                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>
                         {m.type.toUpperCase()} #{m.id}
                       </p>
-                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {m.totalCycles} cycles | {m.issues.length} issues
+                      <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
+                        {m.totalCycles} cycles | {m.issues.length} issues | {m.faultReports.length} faults
                       </p>
                     </div>
                     <div className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -886,15 +1189,15 @@ const handleEndCycle = (machineId: number) => {
             </div>
 
             <div>
-              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Recent Usage History</h4>
+              <h4 className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-black'} mb-3`}>Recent Usage History</h4>
               <div className={`space-y-2 max-h-48 overflow-y-auto ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3`}>
-                {usageHistory.length === 0 ? (
-                  <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'} text-center py-4`}>No usage data yet</p>
+                {sharedState.usageHistory.length === 0 ? (
+                  <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-600'} text-center py-4`}>No usage data yet</p>
                 ) : (
-                  usageHistory.slice(-10).reverse().map(usage => (
-                    <div key={usage.id} className={`flex items-center justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      <span>{usage.machineType.toUpperCase()} #{usage.machineId} - {usage.user}</span>
-                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{new Date(usage.timestamp).toLocaleString()}</span>
+                  sharedState.usageHistory.slice(-10).reverse().map((usage: UsageHistory) => (
+                    <div key={usage.id} className={`flex items-center justify-between text-sm ${darkMode ? 'text-gray-300' : 'text-black'}`}>
+                      <span>{usage.machineType.toUpperCase()} #{usage.machineId} - ID: {usage.user}</span>
+                      <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>{new Date(usage.timestamp).toLocaleString()}</span>
                     </div>
                   ))
                 )}
@@ -903,7 +1206,6 @@ const handleEndCycle = (machineId: number) => {
           </div>
         </div>
       )}
-    </div>
     </>
   );
 };
@@ -921,10 +1223,12 @@ interface MachineCardProps {
   onCollected: (id: number) => void;
   onToggleAvailability: (id: number) => void;
   onShowMaintenance: (machine: Machine) => void;
+  onReportFault: (machine: Machine) => void;
   formatTime: (seconds: number) => string;
+  getUserInfo: (studentId: string) => User | undefined;
 }
 
-const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, categories, onConfirmStart, onCancel, onEndCycle, onCollected, onToggleAvailability, onShowMaintenance, formatTime }: MachineCardProps) => {
+const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, categories, onConfirmStart, onCancel, onEndCycle, onCollected, onToggleAvailability, onShowMaintenance, onReportFault, formatTime, getUserInfo }: MachineCardProps) => {
   return (
     <div 
       id={`machine-${machine.id}`}
@@ -936,13 +1240,15 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
     >
       <div className="flex items-center justify-between mb-3">
         <div>
-          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+          <span className={`font-semibold ${darkMode ? 'text-white' : 'text-black'}`}>
             {machine.type === 'washer' ? 'Washer' : 'Dryer'} #{machine.id}
           </span>
-          <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} flex items-center gap-1`}>
-            <QrCode className="w-3 h-3" />
-            {machine.qrCode}
-          </p>
+          {machine.faultReports.length > 0 && (
+            <div className="flex items-center gap-1 mt-1">
+              <Flag className="w-3 h-3 text-red-500" />
+              <span className="text-xs text-red-500">{machine.faultReports.length} report(s)</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -953,7 +1259,8 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
               : machine.status === 'completed'
               ? darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'
               : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-700'
-          }`}>            {machine.status === 'disabled' ? 'Disabled' : 
+          }`}>
+            {machine.status === 'disabled' ? 'Disabled' : 
              machine.status === 'available' ? 'Available' : 
              machine.status === 'completed' ? 'Done' : 'In Use'}
           </span>
@@ -977,7 +1284,7 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
       </div>
 
       {isAdmin && (
-        <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
+        <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'} mb-3`}>
           <p>Cycles: {machine.totalCycles} | Last: {machine.lastMaintenance}</p>
           {machine.issues.length > 0 && (
             <p className="text-red-500 mt-1">⚠️ {machine.issues[machine.issues.length - 1]}</p>
@@ -987,12 +1294,15 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
 
       {machine.status === 'in-use' && (
         <div className="mb-4">
-          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'} mb-2`}>
             <Clock className="w-4 h-4" />
             <span>{formatTime(machine.timeLeft)} remaining</span>
           </div>
-          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-            User: {machine.currentUser?.name || 'Unknown'}
+          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'} mb-3 space-y-1`}>
+            <p>ID: {machine.currentUser?.studentId || 'Unknown'}</p>
+            {machine.currentUser?.studentId && (
+              <p>Phone: {getUserInfo(machine.currentUser.studentId)?.phoneNumber || 'N/A'}</p>
+            )}
           </div>
           {user && user.studentId === machine.currentUser?.studentId && (
             <div className="flex gap-2">
@@ -1021,8 +1331,11 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
             <CheckCircle className="w-4 h-4" />
             <span>Cycle completed!</span>
           </div>
-          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'} mb-3`}>
-            User: {machine.currentUser?.name || 'Unknown'}
+          <div className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-600'} mb-3 space-y-1`}>
+            <p>ID: {machine.currentUser?.studentId || 'Unknown'}</p>
+            {machine.currentUser?.studentId && (
+              <p>Phone: {getUserInfo(machine.currentUser.studentId)?.phoneNumber || 'N/A'}</p>
+            )}
           </div>
           {user && user.studentId === machine.currentUser?.studentId && (
             <button
@@ -1050,13 +1363,29 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
               {cat.name} ({cat.time}min)
             </button>
           ))}
+          {user && (
+            <button
+              onClick={() => onReportFault(machine)}
+              className={`w-full ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2`}
+            >
+              <Flag className="w-3 h-3" />
+              Report Issue
+            </button>
+          )}
         </div>
       )}
 
       {machine.status === 'disabled' && (
-        <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-          <AlertCircle className="w-4 h-4" />
-          <span>Machine temporarily unavailable</span>
+        <div>
+          <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-500' : 'text-gray-600'} mb-2`}>
+            <AlertCircle className="w-4 h-4" />
+            <span>Machine temporarily unavailable</span>
+          </div>
+          {machine.faultReports.length > 0 && (
+            <div className={`text-xs ${darkMode ? 'text-red-400' : 'text-red-600'} mt-2`}>
+              Latest report: {machine.faultReports[machine.faultReports.length - 1].issue}
+            </div>
+          )}
         </div>
       )}
     </div>
