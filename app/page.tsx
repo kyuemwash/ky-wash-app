@@ -84,16 +84,16 @@ const KYWash = () => {
 
   const washCategories = {
     normal: { name: 'Normal', time: 30 },
-    extra: { name: 'Extra Wash (Add 5 minutes)', time: 35 },
-    extrawash: { name: 'Extra Wash (Add 10 minutes)', time: 40 },
-    extraextrawash: { name: 'Extra Wash (Add 15 minutes)', time: 45 },
+    extra: { name: 'Extra Wash', time: 35 },
+    extrawash: { name: 'Extra Wash', time: 40 },
+    extraextrawash: { name: 'Extra Wash', time: 45 },
   };
 
 const dryCategories = {
     normal: { name: 'Normal', time: 30 },
-    extra: { name: 'Extra Dry (Add 5 minutes)', time: 35 },
-    extradry: { name: 'Extra Dry (Add 10 minutes)', time: 40 },
-    extraextradry: { name: 'Extra Dry (Add 15 minutes)', time: 45 },
+    extra: { name: 'Extra Dry', time: 35 },
+    extradry: { name: 'Extra Dry', time: 40 },
+    extraextradry: { name: 'Extra Dry', time: 45 },
   };
 
   useEffect(() => {
