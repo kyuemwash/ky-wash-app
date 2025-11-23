@@ -62,12 +62,12 @@ const KYWash = () => {
     { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-004', totalCycles: 278, lastMaintenance: '2024-11-12', issues: [] },
     { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-005', totalCycles: 401, lastMaintenance: '2024-11-16', issues: [] },
     { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'WASH-006', totalCycles: 156, lastMaintenance: '2024-11-19', issues: [] },
-    { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-001', totalCycles: 334, lastMaintenance: '2024-11-14', issues: [] },
-    { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-002', totalCycles: 289, lastMaintenance: '2024-11-17', issues: [] },
-    { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-003', totalCycles: 267, lastMaintenance: '2024-11-13', issues: [] },
-    { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-004', totalCycles: 412, lastMaintenance: '2024-11-11', issues: [] },
-    { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-005', totalCycles: 198, lastMaintenance: '2024-11-19', issues: [] },
-    { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-006', totalCycles: 223, lastMaintenance: '2024-11-15', issues: [] },
+    { id: 1, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-001', totalCycles: 334, lastMaintenance: '2024-11-14', issues: [] },
+    { id: 2, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-002', totalCycles: 289, lastMaintenance: '2024-11-17', issues: [] },
+    { id: 3, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-003', totalCycles: 267, lastMaintenance: '2024-11-13', issues: [] },
+    { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-004', totalCycles: 412, lastMaintenance: '2024-11-11', issues: [] },
+    { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-005', totalCycles: 198, lastMaintenance: '2024-11-19', issues: [] },
+    { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, qrCode: 'DRY-006', totalCycles: 223, lastMaintenance: '2024-11-15', issues: [] },
   ]);
   const [washerWaitlist, setWasherWaitlist] = useState<WaitlistItem[]>([]);
   const [dryerWaitlist, setDryerWaitlist] = useState<WaitlistItem[]>([]);
@@ -83,15 +83,17 @@ const KYWash = () => {
   const [showAnalytics, setShowAnalytics] = useState(false);
 
   const washCategories = {
-    quick: { name: 'Quick Wash', time: 15 },
     normal: { name: 'Normal', time: 30 },
-    heavy: { name: 'Heavy Duty', time: 45 },
+    extra: { name: 'Extra Wash (Add 5 minutes)', time: 35 },
+    extrawash: { name: 'Extra Wash (Add 10 minutes)', time: 40 },
+    extraextrawash: { name: 'Extra Wash (Add 15 minutes)', time: 45 },
   };
 
 const dryCategories = {
-    quick: { name: 'Quick Dry', time: 20 },
-    normal: { name: 'Normal', time: 40 },
-    heavy: { name: 'Heavy Dry', time: 60 },
+    normal: { name: 'Normal', time: 30 },
+    extra: { name: 'Extra Dry (Add 5 minutes)', time: 35 },
+    extradry: { name: 'Extra Dry (Add 10 minutes)', time: 40 },
+    extraextradry: { name: 'Extra Dry (Add 15 minutes)', time: 45 },
   };
 
   useEffect(() => {
