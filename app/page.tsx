@@ -74,12 +74,12 @@ const useRealtimeDatabase = () => {
           { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 278, lastMaintenance: '2024-11-12', issues: [], faultReports: [] },
           { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 401, lastMaintenance: '2024-11-16', issues: [], faultReports: [] },
           { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 156, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
-          { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
-          { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
-          { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
-          { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
+          { id: 1, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
+          { id: 2, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
+          { id: 3, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
+          { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
+          { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
+          { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
         ],
         washerWaitlist: [],
         dryerWaitlist: [],
@@ -137,21 +137,24 @@ const KYWash = () => {
   const [reportIssue, setReportIssue] = useState('');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [activeTab, setActiveTab] = useState<'washer' | 'dryer'>('washer');
-  const [expandedWaitlist, setExpandedWaitlist] = useState<'washer' | 'dryer' | null>(null);
+  const [washerWaitlistExpanded, setWasherWaitlistExpanded] = useState(false);
+  const [dryerWaitlistExpanded, setDryerWaitlistExpanded] = useState(false);
   const [collectImmediately, setCollectImmediately] = useState(true);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [machineForPhoto, setMachineForPhoto] = useState<Machine | null>(null);
 
   const washCategories = {
-    quick: { name: 'Quick Wash', time: 15 },
     normal: { name: 'Normal', time: 30 },
-    heavy: { name: 'Heavy Duty', time: 45 },
+    extra5: { name: 'Extra Wash 5 Minutes', time: 35 },
+    extra10: { name: 'Extra Wash 10 Minutes', time: 40 },
+    extra15: { name: 'Extra Wash 15 Minutes', time: 45 },
   };
 
   const dryCategories = {
-    quick: { name: 'Quick Dry', time: 20 },
-    normal: { name: 'Normal', time: 40 },
-    heavy: { name: 'Heavy Dry', time: 60 },
+    normal: { name: 'Normal', time: 30 },
+    extra5: { name: 'Extra Dry 5 Minutes', time: 35 },
+    extra10: { name: 'Extra Dry 10 Minutes', time: 40 },
+    extra15: { name: 'Extra Dry 15 Minutes', time: 45 },
   };
 
   useEffect(() => {
@@ -253,7 +256,17 @@ const KYWash = () => {
       });
     }
 
-    // Browser notification
+    // Store notification persistently for non-logged-in users
+    const allNotifications = JSON.parse(localStorage.getItem('kywash_all_notifications') || '[]');
+    allNotifications.push({
+      ...notif,
+      fullTimestamp: new Date().toISOString(),
+      studentId: userData.studentId,
+      phoneNumber: userData.phoneNumber
+    });
+    localStorage.setItem('kywash_all_notifications', JSON.stringify(allNotifications));
+
+    // Browser notification - works even if user is logged out
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification('KY Wash - Cycle Complete! 🎉', {
@@ -271,8 +284,8 @@ const KYWash = () => {
       } catch {}
     }
 
-    // Simulate SMS notification (in production, use Twilio)
-    console.log(`📱 SMS sent to ${userData.studentId}: ${message}`);
+    // SMS notification simulation
+    console.log(`📱 SMS sent to ${userData.phoneNumber || 'N/A'}: ${message}`);
   };
 
   const logUsage = (machine: Machine) => {
@@ -643,8 +656,23 @@ const KYWash = () => {
   }
 
   if (!user || showAuth) {
+    // Check for pending notifications for this user even if logged out
+    const allNotifications = JSON.parse(localStorage.getItem('kywash_all_notifications') || '[]');
+    const recentNotifs = allNotifications.slice(-3).reverse();
+
     return (
       <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-blue-50 to-indigo-100'} flex items-center justify-center p-4`}>
+        {recentNotifs.length > 0 && (
+          <div className="fixed top-4 right-4 w-96 max-w-full z-50 space-y-2">
+            {recentNotifs.map((notif: any) => (
+              <div key={notif.id} className={`${darkMode ? 'bg-green-900 border-green-700' : 'bg-green-100 border-green-300'} border rounded-lg p-4 shadow-lg`}>
+                <p className={`font-semibold ${darkMode ? 'text-green-200' : 'text-green-800'}`}>Cycle Complete!</p>
+                <p className={`text-sm ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{notif.message}</p>
+                <p className={`text-xs ${darkMode ? 'text-green-400' : 'text-green-600'} mt-1`}>{notif.timestamp}</p>
+              </div>
+            ))}
+          </div>
+        )}
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl shadow-xl p-8 w-full max-w-md`}>
           <div className="text-center mb-8">
             <div className={`inline-block p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-100'} rounded-full mb-4`}>
@@ -827,27 +855,33 @@ const KYWash = () => {
                 <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
               </div>
             </div>
-            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setExpandedWaitlist(expandedWaitlist === 'washer' ? null : 'washer')}>
+            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setWasherWaitlistExpanded(!washerWaitlistExpanded)}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
                   <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{sharedState.washerWaitlist.length}</p>
                 </div>
-                <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
+                <div>
+                  <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
+                  <p className={`text-xs ${darkMode ? 'text-orange-300' : 'text-orange-600'} mt-1 text-center`}>{washerWaitlistExpanded ? 'Show less' : 'Tap to see more'}</p>
+                </div>
               </div>
             </div>
-            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setExpandedWaitlist(expandedWaitlist === 'dryer' ? null : 'dryer')}>
+            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setDryerWaitlistExpanded(!dryerWaitlistExpanded)}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'} font-medium`}>Dryer Waitlist</p>
                   <p className={`text-3xl font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>{sharedState.dryerWaitlist.length}</p>
                 </div>
-                <Clock className={`w-10 h-10 ${darkMode ? 'text-pink-400' : 'text-pink-400'}`} />
+                <div>
+                  <Clock className={`w-10 h-10 ${darkMode ? 'text-pink-400' : 'text-pink-400'}`} />
+                  <p className={`text-xs ${darkMode ? 'text-pink-300' : 'text-pink-600'} mt-1 text-center`}>{dryerWaitlistExpanded ? 'Show less' : 'Tap to see more'}</p>
+                </div>
               </div>
             </div>
           </div>
 
-          {expandedWaitlist === 'washer' && (
+          {washerWaitlistExpanded && (
             <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border mb-6`}>
               <h3 className={`text-lg font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'} mb-3`}>Washer Waitlist - Student IDs</h3>
               {sharedState.washerWaitlist.length === 0 ? (
@@ -865,7 +899,7 @@ const KYWash = () => {
             </div>
           )}
 
-          {expandedWaitlist === 'dryer' && (
+          {dryerWaitlistExpanded && (
             <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border mb-6`}>
               <h3 className={`text-lg font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'} mb-3`}>Dryer Waitlist - Student IDs</h3>
               {sharedState.dryerWaitlist.length === 0 ? (
