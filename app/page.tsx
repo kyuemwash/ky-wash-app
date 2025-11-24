@@ -74,12 +74,12 @@ const useRealtimeDatabase = () => {
           { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 278, lastMaintenance: '2024-11-12', issues: [], faultReports: [] },
           { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 401, lastMaintenance: '2024-11-16', issues: [], faultReports: [] },
           { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 156, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
-          { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
-          { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
-          { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
-          { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
+          { id: 1, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
+          { id: 2, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
+          { id: 3, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
+          { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
+          { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
+          { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
         ],
         washerWaitlist: [],
         dryerWaitlist: [],
@@ -138,15 +138,17 @@ const KYWash = () => {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 
   const washCategories = {
-    quick: { name: 'Quick Wash', time: 15 },
     normal: { name: 'Normal', time: 30 },
-    heavy: { name: 'Heavy Duty', time: 45 },
+    extrawash1: { name: 'Extra Wash 5 minutes', time: 35 },
+    extrawash2: { name: 'Extra Wash 10 minutes', time: 40 },
+    extrawash3: { name: 'Extra Wash 15 minutes', time: 45 },
   };
 
   const dryCategories = {
-    quick: { name: 'Quick Dry', time: 20 },
-    normal: { name: 'Normal', time: 40 },
-    heavy: { name: 'Heavy Dry', time: 60 },
+    normal: { name: 'Normal', time: 30 },
+    extradry1: { name: 'Extra Dry 5 minutes', time: 35 },
+    extradry2: { name: 'Extra Dry 10 minutes', time: 40 },
+    extradry3: { name: 'Extra Dry 15 minutes', time: 45 },
   };
 
   useEffect(() => {
