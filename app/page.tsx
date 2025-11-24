@@ -155,63 +155,66 @@ const KYWash = () => {
     }
   }, []);
 
-  // Timer for machine countdowns - more efficient implementation
-  useEffect(() => {
-    if (!sharedState?.machines) return;
+// Add somewhere near your machine/utility functions
+const getActualTimeLeft = (machine: Machine): number | null => {
+  if (
+    machine.status !== "in-use" ||
+    !machine.cycleStartTimestamp ||
+    !machine.cycleDurationSeconds
+  ) {
+    return null;
+  }
+  const now = Date.now();
+  const elapsed = Math.floor((now - machine.cycleStartTimestamp) / 1000);
+  const timeLeft = machine.cycleDurationSeconds - elapsed;
+  return timeLeft > 0 ? timeLeft : 0;
+};
 
-    // Check if any machine is currently running
-    const hasRunningMachines = sharedState.machines.some((m: Machine) => m.status === 'in-use' && m.timeLeft > 0);
-    if (!hasRunningMachines) return; // No need for timer if nothing is running
-
-    const timer = setInterval(() => {
-      // Get fresh data from localStorage to avoid stale closure
-      const stored = localStorage.getItem('kywash_db');
-      if (!stored) return;
-
-      try {
-        const currentData = JSON.parse(stored);
-        const updatedMachines = currentData.machines.map((m: Machine) => {
-          if (m.status === 'in-use' && m.timeLeft > 0) {
-            const newTime = m.timeLeft - 1;
-            if (newTime === 0) {
-              // Machine cycle completed
-              if (m.currentUser) {
-                sendPushNotification(m.currentUser, m.type, m.id);
-                logUsage(m);
-              }
-              return { 
-                ...m, 
-                status: 'completed', 
-                timeLeft: 0, 
-                totalCycles: m.totalCycles + 1 
-              };
-            }
-            // Machine still running, decrement time
-            return { ...m, timeLeft: newTime };
-          }
-          return m;
-        });
-
-        // Check if any machine actually changed
-        let machinesChanged = false;
-        for (let i = 0; i < updatedMachines.length; i++) {
-          if (updatedMachines[i].timeLeft !== currentData.machines[i].timeLeft ||
-              updatedMachines[i].status !== currentData.machines[i].status) {
+// Timer for machine countdowns - wall-clock implementation
+useEffect(() => {
+  if (!sharedState?.machines) return;
+  const timer = setInterval(() => {
+    const stored = localStorage.getItem("kywash_db");
+    if (!stored) return;
+    try {
+      const currentData = JSON.parse(stored);
+      let machinesChanged = false;
+      const updatedMachines = currentData.machines.map((m: Machine) => {
+        if (
+          m.status === "in-use" &&
+          m.cycleStartTimestamp &&
+          m.cycleDurationSeconds
+        ) {
+          const timeLeft = getActualTimeLeft(m);
+          if (timeLeft === 0) {
             machinesChanged = true;
-            break;
+            if (m.currentUser) {
+              sendPushNotification(m.currentUser, m.type, m.id);
+              logUsage(m);
+            }
+            return {
+              ...m,
+              status: "completed",
+              timeLeft: 0,
+              cycleStartTimestamp: undefined,
+              cycleDurationSeconds: undefined,
+              totalCycles: m.totalCycles + 1,
+            };
           }
         }
+        return m;
+      });
 
-        if (machinesChanged) {
-          updateData({ ...currentData, machines: updatedMachines });
-        }
-      } catch (e) {
-        console.error('Timer update error:', e);
+      if (machinesChanged) {
+        updateData({ ...currentData, machines: updatedMachines });
       }
-    }, 1000);
+    } catch (e) {
+      console.error("Timer update error:", e);
+    }
+  }, 1000);
 
-    return () => clearInterval(timer);
-  }, [sharedState?.machines?.length]); // Only re-run if machine count changes
+  return () => clearInterval(timer);
+}, [sharedState?.machines?.length]);
 
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
