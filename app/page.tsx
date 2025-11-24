@@ -135,6 +135,7 @@ const KYWash = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportMachine, setReportMachine] = useState<Machine | null>(null);
   const [reportIssue, setReportIssue] = useState('');
+  const [reportType, setReportType] = useState<'text' | 'message'>('text');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [activeTab, setActiveTab] = useState<'washer' | 'dryer'>('washer');
   const [washerWaitlistExpanded, setWasherWaitlistExpanded] = useState(false);
@@ -142,6 +143,7 @@ const KYWash = () => {
   const [collectImmediately, setCollectImmediately] = useState(true);
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [machineForPhoto, setMachineForPhoto] = useState<Machine | null>(null);
+  const [photoBlob, setPhotoBlob] = useState<string | null>(null);
 
   const washCategories = {
     normal: { name: 'Normal', time: 30 },
@@ -397,11 +399,26 @@ const KYWash = () => {
       return m;
     });
 
+    // Store report message for admin panel
+    const allReports = JSON.parse(localStorage.getItem('kywash_reports') || '[]');
+    allReports.push({
+      id: newReport.id,
+      machineId: reportMachine.id,
+      machineType: reportMachine.type,
+      studentId: user.studentId,
+      phone: user.phoneNumber,
+      issue: reportIssue.trim(),
+      timestamp: newReport.timestamp,
+      reportType: reportType
+    });
+    localStorage.setItem('kywash_reports', JSON.stringify(allReports));
+
     updateData({ ...sharedState, machines: updatedMachines });
     setReportIssue('');
+    setReportType('text');
     setShowReportModal(false);
     setReportMachine(null);
-    alert('Fault reported successfully! Admin will be notified.');
+    alert(`Fault reported successfully via ${reportType}! Admin will be notified.`);
   };
 
   const handleConfirmStart = (machine: Machine, category: string) => {
@@ -946,17 +963,6 @@ const KYWash = () => {
             {/* Tab Navigation */}
             <div className="flex gap-4 border-b">
               <button
-                onClick={() => setActiveTab('washer')}
-                className={`py-3 px-6 font-semibold text-lg transition border-b-2 ${
-                  activeTab === 'washer'
-                    ? `${darkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'}`
-                    : `${darkMode ? 'text-gray-500 border-transparent hover:text-gray-300' : 'text-gray-500 border-transparent hover:text-gray-700'}`
-                }`}
-              >
-                <Droplet className="inline w-5 h-5 mr-2" />
-                Washers
-              </button>
-              <button
                 onClick={() => setActiveTab('dryer')}
                 className={`py-3 px-6 font-semibold text-lg transition border-b-2 ${
                   activeTab === 'dryer'
@@ -967,48 +973,18 @@ const KYWash = () => {
                 <Wind className="inline w-5 h-5 mr-2" />
                 Dryers
               </button>
+              <button
+                onClick={() => setActiveTab('washer')}
+                className={`py-3 px-6 font-semibold text-lg transition border-b-2 ${
+                  activeTab === 'washer'
+                    ? `${darkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'}`
+                    : `${darkMode ? 'text-gray-500 border-transparent hover:text-gray-300' : 'text-gray-500 border-transparent hover:text-gray-700'}`
+                }`}
+              >
+                <Droplet className="inline w-5 h-5 mr-2" />
+                Washers
+              </button>
             </div>
-
-            {/* Washer Tab */}
-            {activeTab === 'washer' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Washing Machines</h2>
-                  <button
-                    onClick={() => {
-                      setSelectedMachineType('washer');
-                      setShowWaitlistModal(true);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Join Waitlist
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((machine: Machine) => (
-                    <MachineCard
-                      key={machine.id}
-                      machine={machine}
-                      darkMode={darkMode}
-                      selectedMachine={selectedMachine}
-                      isAdmin={isAdmin}
-                      user={user}
-                      categories={washCategories}
-                      onConfirmStart={handleConfirmStart}
-                      onCancel={handleCancelMachine}
-                      onEndCycle={handleEndCycle}
-                      onCollected={handleClothesCollected}
-                      onToggleAvailability={toggleMachineAvailability}
-                      onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
-                      onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
-                      formatTime={formatTime}
-                      getUserInfo={getUserInfo}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Dryer Tab */}
             {activeTab === 'dryer' && (
@@ -1036,6 +1012,47 @@ const KYWash = () => {
                       isAdmin={isAdmin}
                       user={user}
                       categories={dryCategories}
+                      onConfirmStart={handleConfirmStart}
+                      onCancel={handleCancelMachine}
+                      onEndCycle={handleEndCycle}
+                      onCollected={handleClothesCollected}
+                      onToggleAvailability={toggleMachineAvailability}
+                      onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                      onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
+                      formatTime={formatTime}
+                      getUserInfo={getUserInfo}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Washer Tab */}
+            {activeTab === 'washer' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Washing Machines</h2>
+                  <button
+                    onClick={() => {
+                      setSelectedMachineType('washer');
+                      setShowWaitlistModal(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Join Waitlist
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((machine: Machine) => (
+                    <MachineCard
+                      key={machine.id}
+                      machine={machine}
+                      darkMode={darkMode}
+                      selectedMachine={selectedMachine}
+                      isAdmin={isAdmin}
+                      user={user}
+                      categories={washCategories}
                       onConfirmStart={handleConfirmStart}
                       onCancel={handleCancelMachine}
                       onEndCycle={handleEndCycle}
@@ -1115,7 +1132,7 @@ const KYWash = () => {
               </label>
               {!collectImmediately && (
                 <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 ml-8`}>
-                  A photo will be captured when the cycle completes for reference.
+                  If no, snap a picture of your laundry bag.
                 </p>
               )}
             </div>
@@ -1279,6 +1296,146 @@ const KYWash = () => {
           </div>
         </div>
       )}
+
+      {showReportModal && reportMachine && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full my-8`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Report Issue</h3>
+              <button onClick={() => { setShowReportModal(false); setReportMachine(null); setReportIssue(''); }} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className={`${darkMode ? 'text-gray-300' : 'text-black'} mb-3 font-medium`}>
+                Report Issue for {reportMachine.type.toUpperCase()} #{reportMachine.id}
+              </p>
+              
+              <div className="mb-4 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="reportType"
+                    value="text"
+                    checked={reportType === 'text'}
+                    onChange={(e) => setReportType(e.target.value as 'text' | 'message')}
+                    className="cursor-pointer"
+                  />
+                  <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Report via Text</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="reportType"
+                    value="message"
+                    checked={reportType === 'message'}
+                    onChange={(e) => setReportType(e.target.value as 'text' | 'message')}
+                    className="cursor-pointer"
+                  />
+                  <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Report via Message</span>
+                </label>
+              </div>
+            </div>
+            
+            <textarea
+              placeholder="Describe the issue..."
+              className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4`}
+              rows={4}
+              value={reportIssue}
+              onChange={(e) => setReportIssue(e.target.value)}
+            />
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowReportModal(false); setReportMachine(null); setReportIssue(''); }}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReportFault}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium transition"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPhotoCapture && machineForPhoto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full my-8`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Capture Laundry Photo</h3>
+              <button onClick={() => { setShowPhotoCapture(false); setMachineForPhoto(null); }} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-700'} mb-4`}>
+              Take a picture of your laundry bag in {machineForPhoto.type} #{machineForPhoto.id}
+            </p>
+
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    setPhotoBlob(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="w-full mb-4"
+            />
+
+            {photoBlob && (
+              <div className="mb-4">
+                <img src={photoBlob} alt="Laundry photo" className="w-full rounded-lg max-h-64 object-cover" />
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowPhotoCapture(false); setMachineForPhoto(null); setPhotoBlob(null); }}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (photoBlob) {
+                    // Store photo for viewing by others
+                    const machinePhotos = JSON.parse(localStorage.getItem('kywash_photos') || '{}');
+                    if (!machinePhotos[machineForPhoto.id]) {
+                      machinePhotos[machineForPhoto.id] = [];
+                    }
+                    machinePhotos[machineForPhoto.id].push({
+                      studentId: user?.studentId,
+                      photo: photoBlob,
+                      timestamp: new Date().toISOString()
+                    });
+                    localStorage.setItem('kywash_photos', JSON.stringify(machinePhotos));
+                    alert('Photo saved successfully!');
+                    setShowPhotoCapture(false);
+                    setMachineForPhoto(null);
+                    setPhotoBlob(null);
+                  }
+                }}
+                disabled={!photoBlob}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -1423,6 +1580,11 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
 
       {machine.status === 'available' && machine.enabled && (
         <div className="space-y-2">
+          {machine.faultReports.length > 0 && (
+            <div className={`p-2 rounded-lg ${darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-50 text-yellow-700'} text-xs font-medium`}>
+              ⚠️ There are reports by other users.
+            </div>
+          )}
           {Object.entries(categories).map(([key, cat]) => (
             <button
               key={key}
