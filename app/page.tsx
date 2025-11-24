@@ -144,6 +144,10 @@ const KYWash = () => {
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [machineForPhoto, setMachineForPhoto] = useState<Machine | null>(null);
   const [photoBlob, setPhotoBlob] = useState<string | null>(null);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [showGlobalView, setShowGlobalView] = useState(false);
+  const [confirmPhotoNeeded, setConfirmPhotoNeeded] = useState(false);
 
   const washCategories = {
     normal: { name: 'Normal', time: 30 },
@@ -315,8 +319,8 @@ const KYWash = () => {
       return;
     }
     
-    if (authMode === 'register' && (!formData.phoneNumber || formData.phoneNumber.length < 10)) {
-      alert('Please enter a valid phone number (at least 10 digits)');
+    if (authMode === 'register' && (!formData.phoneNumber || formData.phoneNumber.length < 10 || formData.phoneNumber.length > 11)) {
+      alert('Please enter a valid phone number (10-11 digits)');
       return;
     }
 
@@ -446,33 +450,46 @@ const KYWash = () => {
     const time = cycle.time * 60;
 
     const updatedMachines = sharedState.machines.map((m: Machine) =>
-      m.id === machine.id
+      m.id === machine.id && m.type === machine.type
         ? { ...m, status: 'in-use', category, timeLeft: time, currentUser: user }
         : m
     );
 
-    updateData({ ...sharedState, machines: updatedMachines });
+    // Auto-remove user from waitlist when starting machine
+    const updatedWasherWaitlist = machine.type === 'washer' 
+      ? sharedState.washerWaitlist.filter((w: WaitlistItem) => w.studentId !== user.studentId)
+      : sharedState.washerWaitlist;
+    const updatedDryerWaitlist = machine.type === 'dryer'
+      ? sharedState.dryerWaitlist.filter((w: WaitlistItem) => w.studentId !== user.studentId)
+      : sharedState.dryerWaitlist;
+
+    updateData({ 
+      ...sharedState, 
+      machines: updatedMachines,
+      washerWaitlist: updatedWasherWaitlist,
+      dryerWaitlist: updatedDryerWaitlist
+    });
     setConfirmModal(null);
     setSelectedMachine(null);
   };
 
-  const handleCancelMachine = (machineId: number) => {
+  const handleCancelMachine = (machineId: number, machineType: string) => {
     if (!sharedState) return;
     const updatedMachines = sharedState.machines.map((m: Machine) =>
-      m.id === machineId
+      m.id === machineId && m.type === machineType
         ? { ...m, status: 'available', timeLeft: 0, currentUser: null, category: 'normal' }
         : m
     );
     updateData({ ...sharedState, machines: updatedMachines });
   };
 
-  const handleEndCycle = (machineId: number) => {
+  const handleEndCycle = (machineId: number, machineType: string) => {
     if (!sharedState) return;
-    const machine = sharedState.machines.find((m: Machine) => m.id === machineId);
+    const machine = sharedState.machines.find((m: Machine) => m.id === machineId && m.type === machineType);
     if (machine) logUsage(machine);
     
     const updatedMachines = sharedState.machines.map((m: Machine) =>
-      m.id === machineId
+      m.id === machineId && m.type === machineType
         ? { ...m, status: 'completed', timeLeft: 0, totalCycles: m.totalCycles + 1 }
         : m
     );
@@ -525,6 +542,38 @@ const KYWash = () => {
       washerWaitlist: type === 'washer' ? sharedState.washerWaitlist.filter((item: WaitlistItem) => item.id !== itemId) : sharedState.washerWaitlist,
       dryerWaitlist: type === 'dryer' ? sharedState.dryerWaitlist.filter((item: WaitlistItem) => item.id !== itemId) : sharedState.dryerWaitlist,
     });
+  };
+
+  const handleLeaveWaitlistByStudentId = (type: string) => {
+    if (!user || !sharedState) return;
+    updateData({
+      ...sharedState,
+      washerWaitlist: type === 'washer' ? sharedState.washerWaitlist.filter((item: WaitlistItem) => item.studentId !== user.studentId) : sharedState.washerWaitlist,
+      dryerWaitlist: type === 'dryer' ? sharedState.dryerWaitlist.filter((item: WaitlistItem) => item.studentId !== user.studentId) : sharedState.dryerWaitlist,
+    });
+  };
+
+  const handleUpdateProfile = () => {
+    if (!user || editPhoneNumber.length < 10 || editPhoneNumber.length > 11) {
+      alert('Please enter a valid phone number (10-11 digits)');
+      return;
+    }
+
+    // Update user state
+    const updatedUser = { ...user, phoneNumber: editPhoneNumber };
+    setUser(updatedUser);
+
+    // Update localStorage with new phone number
+    const registeredUsersStr = localStorage.getItem('kywash_users');
+    const registeredUsers: User[] = registeredUsersStr ? JSON.parse(registeredUsersStr) : [];
+    const updatedUsers = registeredUsers.map(u => 
+      u.studentId === user.studentId ? updatedUser : u
+    );
+    localStorage.setItem('kywash_users', JSON.stringify(updatedUsers));
+
+    setShowProfileEdit(false);
+    setEditPhoneNumber('');
+    alert('Profile updated successfully!');
   };
 
   const toggleMachineAvailability = (machineId: number) => {
@@ -743,7 +792,8 @@ const KYWash = () => {
             {authMode === 'register' && (
               <input
                 type="tel"
-                placeholder="Phone Number (for communication)"
+                placeholder="Phone Number (10-11 digits)"
+                maxLength={11}
                 className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 text-black'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                 value={formData.phoneNumber}
                 onChange={(e) => setFormData({...formData, phoneNumber: e.target.value.replace(/\D/g, '')})}
@@ -825,6 +875,23 @@ const KYWash = () => {
             </div>
             {user ? (
               <>
+                <button
+                  onClick={() => setShowGlobalView(true)}
+                  className={`${darkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'} transition`}
+                  title="Global View"
+                >
+                  <TrendingUp className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProfileEdit(true);
+                    setEditPhoneNumber(user.phoneNumber || '');
+                  }}
+                  className={`${darkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'} transition`}
+                  title="Edit Profile"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
                 <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-gray-400' : 'text-black'}`}>
                   <User className="w-4 h-4" />
                   <span>ID: {user.studentId}</span>
@@ -854,13 +921,16 @@ const KYWash = () => {
       <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
+            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setWasherWaitlistExpanded(!washerWaitlistExpanded)}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
+                  <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{sharedState.washerWaitlist.length}</p>
                 </div>
-                <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
+                <div>
+                  <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
+                  <p className={`text-xs ${darkMode ? 'text-orange-300' : 'text-orange-600'} mt-1 text-center`}>{washerWaitlistExpanded ? 'Show less' : 'Tap to see more'}</p>
+                </div>
               </div>
             </div>
             <div className={`${darkMode ? 'bg-purple-900 border-purple-800' : 'bg-purple-50 border-purple-100'} rounded-xl p-4 border`}>
@@ -872,16 +942,13 @@ const KYWash = () => {
                 <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
               </div>
             </div>
-            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setWasherWaitlistExpanded(!washerWaitlistExpanded)}>
+            <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>{sharedState.washerWaitlist.length}</p>
+                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
                 </div>
-                <div>
-                  <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
-                  <p className={`text-xs ${darkMode ? 'text-orange-300' : 'text-orange-600'} mt-1 text-center`}>{washerWaitlistExpanded ? 'Show less' : 'Tap to see more'}</p>
-                </div>
+                <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
               </div>
             </div>
             <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setDryerWaitlistExpanded(!dryerWaitlistExpanded)}>
@@ -900,15 +967,32 @@ const KYWash = () => {
 
           {washerWaitlistExpanded && (
             <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border mb-6`}>
-              <h3 className={`text-lg font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'} mb-3`}>Washer Waitlist - Student IDs</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-lg font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>Washer Waitlist - Student IDs</h3>
+                {user && sharedState.washerWaitlist.some((w: WaitlistItem) => w.studentId === user.studentId) && (
+                  <button
+                    onClick={() => handleLeaveWaitlistByStudentId('washer')}
+                    className="bg-red-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-600 transition"
+                  >
+                    Leave Waitlist
+                  </button>
+                )}
+              </div>
               {sharedState.washerWaitlist.length === 0 ? (
                 <p className={`${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>No one waiting</p>
               ) : (
                 <div className={`grid grid-cols-2 md:grid-cols-4 gap-2`}>
                   {sharedState.washerWaitlist.map((item: WaitlistItem, idx: number) => (
-                    <div key={item.id} className={`${darkMode ? 'bg-orange-800' : 'bg-white'} rounded-lg p-3 text-center border`}>
+                    <div key={item.id} className={`${darkMode ? 'bg-orange-800' : 'bg-white'} rounded-lg p-3 text-center border relative`}>
                       <p className={`font-semibold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>#{idx + 1}</p>
                       <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>{item.studentId}</p>
+                      <button
+                        onClick={() => handleLeaveWaitlist('washer', item.id)}
+                        className="absolute top-1 right-1 text-red-500 hover:text-red-700"
+                        title="Remove from waitlist"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -918,15 +1002,32 @@ const KYWash = () => {
 
           {dryerWaitlistExpanded && (
             <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border mb-6`}>
-              <h3 className={`text-lg font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'} mb-3`}>Dryer Waitlist - Student IDs</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-lg font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>Dryer Waitlist - Student IDs</h3>
+                {user && sharedState.dryerWaitlist.some((w: WaitlistItem) => w.studentId === user.studentId) && (
+                  <button
+                    onClick={() => handleLeaveWaitlistByStudentId('dryer')}
+                    className="bg-red-500 text-white px-3 py-1 rounded text-xs font-medium hover:bg-red-600 transition"
+                  >
+                    Leave Waitlist
+                  </button>
+                )}
+              </div>
               {sharedState.dryerWaitlist.length === 0 ? (
                 <p className={`${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>No one waiting</p>
               ) : (
                 <div className={`grid grid-cols-2 md:grid-cols-4 gap-2`}>
                   {sharedState.dryerWaitlist.map((item: WaitlistItem, idx: number) => (
-                    <div key={item.id} className={`${darkMode ? 'bg-pink-800' : 'bg-white'} rounded-lg p-3 text-center border`}>
+                    <div key={item.id} className={`${darkMode ? 'bg-pink-800' : 'bg-white'} rounded-lg p-3 text-center border relative`}>
                       <p className={`font-semibold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>#{idx + 1}</p>
                       <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>{item.studentId}</p>
+                      <button
+                        onClick={() => handleLeaveWaitlist('dryer', item.id)}
+                        className="absolute top-1 right-1 text-red-500 hover:text-red-700"
+                        title="Remove from waitlist"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1131,9 +1232,34 @@ const KYWash = () => {
                 </span>
               </label>
               {!collectImmediately && (
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 ml-8`}>
-                  If no, snap a picture of your laundry bag.
-                </p>
+                <div className="mt-3 ml-8">
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-2`}>
+                    Upload a photo of your laundry bag:
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setPhotoBlob(reader.result as string);
+                          setConfirmPhotoNeeded(true);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 text-sm rounded border ${darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'}`}
+                  />
+                  {photoBlob && (
+                    <div className="mt-2">
+                      <img src={photoBlob} alt="Laundry photo" className="w-full rounded max-h-32 object-cover" />
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-green-400' : 'text-green-600'}`}>✓ Photo selected</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1310,31 +1436,6 @@ const KYWash = () => {
               <p className={`${darkMode ? 'text-gray-300' : 'text-black'} mb-3 font-medium`}>
                 Report Issue for {reportMachine.type.toUpperCase()} #{reportMachine.id}
               </p>
-              
-              <div className="mb-4 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="text"
-                    checked={reportType === 'text'}
-                    onChange={(e) => setReportType(e.target.value as 'text' | 'message')}
-                    className="cursor-pointer"
-                  />
-                  <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Report via Text</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="reportType"
-                    value="message"
-                    checked={reportType === 'message'}
-                    onChange={(e) => setReportType(e.target.value as 'text' | 'message')}
-                    className="cursor-pointer"
-                  />
-                  <span className={`${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Report via Message</span>
-                </label>
-              </div>
             </div>
             
             <textarea
@@ -1436,6 +1537,124 @@ const KYWash = () => {
           </div>
         </div>
       )}
+
+      {showProfileEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-md w-full my-8`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Edit Profile</h3>
+              <button onClick={() => setShowProfileEdit(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Student ID</label>
+              <input
+                type="text"
+                value={user?.studentId || ''}
+                disabled
+                className={`w-full px-4 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} rounded-lg opacity-50 cursor-not-allowed`}
+              />
+            </div>
+            <div className="mb-4">
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Phone Number</label>
+              <input
+                type="tel"
+                value={editPhoneNumber}
+                onChange={(e) => setEditPhoneNumber(e.target.value)}
+                placeholder="Enter phone (10-11 digits)"
+                className={`w-full px-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500`}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowProfileEdit(false)}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateProfile}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGlobalView && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-4xl w-full my-8 max-h-96 overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Global View - All Machines</h3>
+              <button onClick={() => setShowGlobalView(false)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {/* Washers */}
+              <div>
+                <h4 className={`font-bold mb-3 ${darkMode ? 'text-blue-300' : 'text-blue-600'}`}>Washers</h4>
+                <div className="space-y-2">
+                  {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((m: Machine) => (
+                    <div key={`${m.type}-${m.id}`} className={`p-3 rounded-lg border ${m.status === 'in-use' ? darkMode ? 'bg-red-900 border-red-700' : 'bg-red-100 border-red-300' : m.status === 'available' ? darkMode ? 'bg-green-900 border-green-700' : 'bg-green-100 border-green-300' : darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-black'}`}>Washer #{m.id}</span>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${m.status === 'in-use' ? 'bg-red-500 text-white' : m.status === 'available' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                          {m.status.toUpperCase()}
+                        </span>
+                      </div>
+                      {m.currentUser && <p className={`text-xs mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>User: {m.currentUser.studentId} - {m.timeLeft > 0 ? `${Math.floor(m.timeLeft / 60)}:${(m.timeLeft % 60).toString().padStart(2, '0')}` : 'Done'}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Dryers */}
+              <div>
+                <h4 className={`font-bold mb-3 ${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>Dryers</h4>
+                <div className="space-y-2">
+                  {sharedState.machines.filter((m: Machine) => m.type === 'dryer').map((m: Machine) => (
+                    <div key={`${m.type}-${m.id}`} className={`p-3 rounded-lg border ${m.status === 'in-use' ? darkMode ? 'bg-red-900 border-red-700' : 'bg-red-100 border-red-300' : m.status === 'available' ? darkMode ? 'bg-green-900 border-green-700' : 'bg-green-100 border-green-300' : darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`font-semibold ${darkMode ? 'text-white' : 'text-black'}`}>Dryer #{m.id}</span>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${m.status === 'in-use' ? 'bg-red-500 text-white' : m.status === 'available' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                          {m.status.toUpperCase()}
+                        </span>
+                      </div>
+                      {m.currentUser && <p className={`text-xs mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>User: {m.currentUser.studentId} - {m.timeLeft > 0 ? `${Math.floor(m.timeLeft / 60)}:${(m.timeLeft % 60).toString().padStart(2, '0')}` : 'Done'}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Waitlists */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className={`font-bold mb-2 ${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>Washer Waitlist ({sharedState.washerWaitlist.length})</h4>
+                <div className={`p-3 rounded-lg ${darkMode ? 'bg-orange-900 border-orange-700' : 'bg-orange-50 border-orange-200'} border text-sm`}>
+                  {sharedState.washerWaitlist.length === 0 ? <p className={darkMode ? 'text-orange-300' : 'text-orange-600'}>Empty</p> : sharedState.washerWaitlist.map((w: WaitlistItem, i: number) => <p key={w.id} className={darkMode ? 'text-orange-300' : 'text-orange-600'}>{i + 1}. {w.studentId}</p>)}
+                </div>
+              </div>
+              <div>
+                <h4 className={`font-bold mb-2 ${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>Dryer Waitlist ({sharedState.dryerWaitlist.length})</h4>
+                <div className={`p-3 rounded-lg ${darkMode ? 'bg-pink-900 border-pink-700' : 'bg-pink-50 border-pink-200'} border text-sm`}>
+                  {sharedState.dryerWaitlist.length === 0 ? <p className={darkMode ? 'text-pink-300' : 'text-pink-600'}>Empty</p> : sharedState.dryerWaitlist.map((w: WaitlistItem, i: number) => <p key={w.id} className={darkMode ? 'text-pink-300' : 'text-pink-600'}>{i + 1}. {w.studentId}</p>)}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowGlobalView(false)}
+                className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -1448,8 +1667,8 @@ interface MachineCardProps {
   user: User | null;
   categories: { [key: string]: { name: string; time: number } };
   onConfirmStart: (machine: Machine, category: string) => void;
-  onCancel: (id: number) => void;
-  onEndCycle: (id: number) => void;
+  onCancel: (id: number, type: string) => void;
+  onEndCycle: (id: number, type: string) => void;
   onCollected: (id: number) => void;
   onToggleAvailability: (id: number) => void;
   onShowMaintenance: (machine: Machine) => void;
@@ -1537,14 +1756,14 @@ const MachineCard = ({ machine, darkMode, selectedMachine, isAdmin, user, catego
           {user && user.studentId === machine.currentUser?.studentId && (
             <div className="flex gap-2">
               <button
-                onClick={() => onCancel(machine.id)}
+                onClick={() => onCancel(machine.id, machine.type)}
                 className={`flex-1 ${darkMode ? 'bg-red-900 hover:bg-red-800 text-red-200' : 'bg-red-50 hover:bg-red-100 text-red-700'} py-2 rounded-lg text-sm font-medium transition`}
               >
                 Cancel
               </button>
               {isAdmin && (
                 <button
-                  onClick={() => onEndCycle(machine.id)}
+                  onClick={() => onEndCycle(machine.id, machine.type)}
                   className={`flex-1 ${darkMode ? 'bg-blue-900 hover:bg-blue-800 text-blue-200' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'} py-2 rounded-lg text-sm font-medium transition`}
                 >
                   End Now
