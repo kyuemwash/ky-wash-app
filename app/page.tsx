@@ -74,12 +74,12 @@ const useRealtimeDatabase = () => {
           { id: 4, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 278, lastMaintenance: '2024-11-12', issues: [], faultReports: [] },
           { id: 5, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 401, lastMaintenance: '2024-11-16', issues: [], faultReports: [] },
           { id: 6, type: 'washer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 156, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 1, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
-          { id: 2, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
-          { id: 3, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
-          { id: 4, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
-          { id: 5, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
-          { id: 6, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
+          { id: 7, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 334, lastMaintenance: '2024-11-14', issues: [], faultReports: [] },
+          { id: 8, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 289, lastMaintenance: '2024-11-17', issues: [], faultReports: [] },
+          { id: 9, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 267, lastMaintenance: '2024-11-13', issues: [], faultReports: [] },
+          { id: 10, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 412, lastMaintenance: '2024-11-11', issues: [], faultReports: [] },
+          { id: 11, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 198, lastMaintenance: '2024-11-19', issues: [], faultReports: [] },
+          { id: 12, type: 'dryer', status: 'available', category: 'normal', timeLeft: 0, currentUser: null, enabled: true, totalCycles: 223, lastMaintenance: '2024-11-15', issues: [], faultReports: [] },
         ],
         washerWaitlist: [],
         dryerWaitlist: [],
@@ -136,19 +136,22 @@ const KYWash = () => {
   const [reportMachine, setReportMachine] = useState<Machine | null>(null);
   const [reportIssue, setReportIssue] = useState('');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [activeTab, setActiveTab] = useState<'washer' | 'dryer'>('washer');
+  const [expandedWaitlist, setExpandedWaitlist] = useState<'washer' | 'dryer' | null>(null);
+  const [collectImmediately, setCollectImmediately] = useState(true);
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [machineForPhoto, setMachineForPhoto] = useState<Machine | null>(null);
 
   const washCategories = {
+    quick: { name: 'Quick Wash', time: 15 },
     normal: { name: 'Normal', time: 30 },
-    extrawash1: { name: 'Extra Wash 5 minutes', time: 35 },
-    extrawash2: { name: 'Extra Wash 10 minutes', time: 40 },
-    extrawash3: { name: 'Extra Wash 15 minutes', time: 45 },
+    heavy: { name: 'Heavy Duty', time: 45 },
   };
 
   const dryCategories = {
-    normal: { name: 'Normal', time: 30 },
-    extradry1: { name: 'Extra Dry 5 minutes', time: 35 },
-    extradry2: { name: 'Extra Dry 10 minutes', time: 40 },
-    extradry3: { name: 'Extra Dry 15 minutes', time: 45 },
+    quick: { name: 'Quick Dry', time: 20 },
+    normal: { name: 'Normal', time: 40 },
+    heavy: { name: 'Heavy Dry', time: 60 },
   };
 
   useEffect(() => {
@@ -824,7 +827,7 @@ const KYWash = () => {
                 <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
               </div>
             </div>
-            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border`}>
+            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setExpandedWaitlist(expandedWaitlist === 'washer' ? null : 'washer')}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'} font-medium`}>Washer Waitlist</p>
@@ -833,7 +836,7 @@ const KYWash = () => {
                 <Clock className={`w-10 h-10 ${darkMode ? 'text-orange-400' : 'text-orange-400'}`} />
               </div>
             </div>
-            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border`}>
+            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setExpandedWaitlist(expandedWaitlist === 'dryer' ? null : 'dryer')}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'} font-medium`}>Dryer Waitlist</p>
@@ -843,6 +846,42 @@ const KYWash = () => {
               </div>
             </div>
           </div>
+
+          {expandedWaitlist === 'washer' && (
+            <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border mb-6`}>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-orange-200' : 'text-orange-700'} mb-3`}>Washer Waitlist - Student IDs</h3>
+              {sharedState.washerWaitlist.length === 0 ? (
+                <p className={`${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>No one waiting</p>
+              ) : (
+                <div className={`grid grid-cols-2 md:grid-cols-4 gap-2`}>
+                  {sharedState.washerWaitlist.map((item: WaitlistItem, idx: number) => (
+                    <div key={item.id} className={`${darkMode ? 'bg-orange-800' : 'bg-white'} rounded-lg p-3 text-center border`}>
+                      <p className={`font-semibold ${darkMode ? 'text-orange-200' : 'text-orange-700'}`}>#{idx + 1}</p>
+                      <p className={`text-sm ${darkMode ? 'text-orange-300' : 'text-orange-600'}`}>{item.studentId}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {expandedWaitlist === 'dryer' && (
+            <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border mb-6`}>
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-pink-200' : 'text-pink-700'} mb-3`}>Dryer Waitlist - Student IDs</h3>
+              {sharedState.dryerWaitlist.length === 0 ? (
+                <p className={`${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>No one waiting</p>
+              ) : (
+                <div className={`grid grid-cols-2 md:grid-cols-4 gap-2`}>
+                  {sharedState.dryerWaitlist.map((item: WaitlistItem, idx: number) => (
+                    <div key={item.id} className={`${darkMode ? 'bg-pink-800' : 'bg-white'} rounded-lg p-3 text-center border`}>
+                      <p className={`font-semibold ${darkMode ? 'text-pink-200' : 'text-pink-700'}`}>#{idx + 1}</p>
+                      <p className={`text-sm ${darkMode ? 'text-pink-300' : 'text-pink-600'}`}>{item.studentId}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {sharedState.notifications.length > 0 && (
             <div className={`mb-6 ${darkMode ? 'bg-yellow-900 border-yellow-800' : 'bg-yellow-50 border-yellow-200'} border rounded-xl p-4`}>
@@ -870,140 +909,115 @@ const KYWash = () => {
           )}
 
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Washing Machines</h2>
-                <button
-                  onClick={() => {
-                    setSelectedMachineType('washer');
-                    setShowWaitlistModal(true);
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Join Waitlist
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((machine: Machine) => (
-                  <MachineCard
-                    key={machine.id}
-                    machine={machine}
-                    darkMode={darkMode}
-                    selectedMachine={selectedMachine}
-                    isAdmin={isAdmin}
-                    user={user}
-                    categories={washCategories}
-                    onConfirmStart={handleConfirmStart}
-                    onCancel={handleCancelMachine}
-                    onEndCycle={handleEndCycle}
-                    onCollected={handleClothesCollected}
-                    onToggleAvailability={toggleMachineAvailability}
-                    onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
-                    onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
-                    formatTime={formatTime}
-                    getUserInfo={getUserInfo}
-                  />
-                ))}
-              </div>
+            {/* Tab Navigation */}
+            <div className="flex gap-4 border-b">
+              <button
+                onClick={() => setActiveTab('washer')}
+                className={`py-3 px-6 font-semibold text-lg transition border-b-2 ${
+                  activeTab === 'washer'
+                    ? `${darkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'}`
+                    : `${darkMode ? 'text-gray-500 border-transparent hover:text-gray-300' : 'text-gray-500 border-transparent hover:text-gray-700'}`
+                }`}
+              >
+                <Droplet className="inline w-5 h-5 mr-2" />
+                Washers
+              </button>
+              <button
+                onClick={() => setActiveTab('dryer')}
+                className={`py-3 px-6 font-semibold text-lg transition border-b-2 ${
+                  activeTab === 'dryer'
+                    ? `${darkMode ? 'text-purple-400 border-purple-400' : 'text-purple-600 border-purple-600'}`
+                    : `${darkMode ? 'text-gray-500 border-transparent hover:text-gray-300' : 'text-gray-500 border-transparent hover:text-gray-700'}`
+                }`}
+              >
+                <Wind className="inline w-5 h-5 mr-2" />
+                Dryers
+              </button>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Dryers</h2>
-                <button
-                  onClick={() => {
-                    setSelectedMachineType('dryer');
-                    setShowWaitlistModal(true);
-                  }}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Join Waitlist
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sharedState.machines.filter((m: Machine) => m.type === 'dryer').map((machine: Machine) => (
-                  <MachineCard
-                    key={machine.id}
-                    machine={machine}
-                    darkMode={darkMode}
-                    selectedMachine={selectedMachine}
-                    isAdmin={isAdmin}
-                    user={user}
-                    categories={dryCategories}
-                    onConfirmStart={handleConfirmStart}
-                    onCancel={handleCancelMachine}
-                    onEndCycle={handleEndCycle}
-                    onCollected={handleClothesCollected}
-                    onToggleAvailability={toggleMachineAvailability}
-                    onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
-                    onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
-                    formatTime={formatTime}
-                    getUserInfo={getUserInfo}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
-              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-black'} mb-4`}>Washer Waitlist</h3>
-              {sharedState.washerWaitlist.length === 0 ? (
-                <p className={`${darkMode ? 'text-gray-500' : 'text-gray-600'} text-center py-4`}>No one waiting</p>
-              ) : (
-                <div className="space-y-2">
-                  {sharedState.washerWaitlist.map((item: WaitlistItem) => (
-                    <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-blue-900' : 'bg-blue-50'} rounded-lg`}>
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>Student ID: {item.studentId}</p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.timestamp}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {(user && (user.studentId === item.studentId || isAdmin)) && (
-                          <button
-                            onClick={() => handleLeaveWaitlist('washer', item.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+            {/* Washer Tab */}
+            {activeTab === 'washer' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Washing Machines</h2>
+                  <button
+                    onClick={() => {
+                      setSelectedMachineType('washer');
+                      setShowWaitlistModal(true);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Join Waitlist
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {sharedState.machines.filter((m: Machine) => m.type === 'washer').map((machine: Machine) => (
+                    <MachineCard
+                      key={machine.id}
+                      machine={machine}
+                      darkMode={darkMode}
+                      selectedMachine={selectedMachine}
+                      isAdmin={isAdmin}
+                      user={user}
+                      categories={washCategories}
+                      onConfirmStart={handleConfirmStart}
+                      onCancel={handleCancelMachine}
+                      onEndCycle={handleEndCycle}
+                      onCollected={handleClothesCollected}
+                      onToggleAvailability={toggleMachineAvailability}
+                      onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                      onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
+                      formatTime={formatTime}
+                      getUserInfo={getUserInfo}
+                    />
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl p-5 shadow-sm border`}>
-              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-black'} mb-4`}>Dryer Waitlist</h3>
-              {sharedState.dryerWaitlist.length === 0 ? (
-                <p className={`${darkMode ? 'text-gray-500' : 'text-gray-600'} text-center py-4`}>No one waiting</p>
-              ) : (
-                <div className="space-y-2">
-                  {sharedState.dryerWaitlist.map((item: WaitlistItem) => (
-                    <div key={item.id} className={`flex items-center justify-between p-3 ${darkMode ? 'bg-purple-900' : 'bg-purple-50'} rounded-lg`}>
-                      <div>
-                        <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-black'}`}>Student ID: {item.studentId}</p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.timestamp}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {(user && (user.studentId === item.studentId || isAdmin)) && (
-                          <button
-                            onClick={() => handleLeaveWaitlist('dryer', item.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+            {/* Dryer Tab */}
+            {activeTab === 'dryer' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Dryers</h2>
+                  <button
+                    onClick={() => {
+                      setSelectedMachineType('dryer');
+                      setShowWaitlistModal(true);
+                    }}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Join Waitlist
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {sharedState.machines.filter((m: Machine) => m.type === 'dryer').map((machine: Machine) => (
+                    <MachineCard
+                      key={machine.id}
+                      machine={machine}
+                      darkMode={darkMode}
+                      selectedMachine={selectedMachine}
+                      isAdmin={isAdmin}
+                      user={user}
+                      categories={dryCategories}
+                      onConfirmStart={handleConfirmStart}
+                      onCancel={handleCancelMachine}
+                      onEndCycle={handleEndCycle}
+                      onCollected={handleClothesCollected}
+                      onToggleAvailability={toggleMachineAvailability}
+                      onShowMaintenance={(m: Machine) => { setSelectedMachine(m); setShowMaintenanceModal(true); }}
+                      onReportFault={(m: Machine) => { setReportMachine(m); setShowReportModal(true); }}
+                      formatTime={formatTime}
+                      getUserInfo={getUserInfo}
+                    />
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
 
@@ -1033,8 +1047,8 @@ const KYWash = () => {
       )}
 
       {confirmModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full`}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-2xl p-6 max-w-sm w-full my-8`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>Confirm Start</h3>
               <button onClick={() => setConfirmModal(null)} className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} hover:text-gray-700`}>
@@ -1052,9 +1066,32 @@ const KYWash = () => {
                 Duration: <strong>{confirmModal.machine.type === 'washer' ? washCategories[confirmModal.category as keyof typeof washCategories].time : dryCategories[confirmModal.category as keyof typeof dryCategories].time} minutes</strong>
               </p>
             </div>
+
+            <div className={`mb-6 p-4 ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg`}>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={collectImmediately}
+                  onChange={(e) => setCollectImmediately(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 cursor-pointer"
+                />
+                <span className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium`}>
+                  I will collect my laundry immediately when done
+                </span>
+              </label>
+              {!collectImmediately && (
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-2 ml-8`}>
+                  A photo will be captured when the cycle completes for reference.
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <button
-                onClick={() => setConfirmModal(null)}
+                onClick={() => {
+                  setConfirmModal(null);
+                  setCollectImmediately(true);
+                }}
                 className={`flex-1 ${darkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300' : 'bg-gray-100 hover:bg-gray-200 text-black'} py-3 rounded-lg font-medium transition`}
               >
                 Cancel
