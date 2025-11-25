@@ -60,16 +60,39 @@ const ADMIN_PASSWORD = "admin123";
 const useRealtimeDatabase = () => {
   const [data, setData] = useState<any>(null);
   const broadcastChannelRef = React.useRef<BroadcastChannel | null>(null);
+  const syncChannelRef = React.useRef<BroadcastChannel | null>(null);
+  const activityChannelRef = React.useRef<BroadcastChannel | null>(null);
   const lastUpdateRef = React.useRef<number>(0);
   
   useEffect(() => {
-    // Initialize BroadcastChannel for same-device cross-tab communication
+    // Initialize BroadcastChannels for cross-device communication
     try {
+      // Main sync channel
       broadcastChannelRef.current = new BroadcastChannel('kywash_sync');
       broadcastChannelRef.current.onmessage = (event) => {
-        if (event.data?.type === 'update') {
-          setData(event.data.payload);
-          lastUpdateRef.current = event.data.timestamp;
+        if (event.data?.type === 'update' && event.data?.payload) {
+          const newTimestamp = event.data.timestamp || 0;
+          if (newTimestamp > lastUpdateRef.current) {
+            setData(event.data.payload);
+            lastUpdateRef.current = newTimestamp;
+          }
+        }
+      };
+
+      // Activity channel for cross-device activity updates
+      activityChannelRef.current = new BroadcastChannel('kywash_activity');
+      activityChannelRef.current.onmessage = (event) => {
+        if (event.data?.type === 'timer_update') {
+          // Re-read from localStorage when timer updates from any device
+          const stored = localStorage.getItem('kywash_db');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            const newTimestamp = parsed.lastUpdate || 0;
+            if (newTimestamp > lastUpdateRef.current) {
+              setData(parsed);
+              lastUpdateRef.current = newTimestamp;
+            }
+          }
         }
       };
     } catch (e) {
@@ -110,23 +133,31 @@ const useRealtimeDatabase = () => {
       lastUpdateRef.current = initialData.lastUpdate;
     }
 
-    // Poll for updates from other devices/tabs every 300ms (faster for real-time feel)
-    const interval = setInterval(() => {
+    // Aggressive polling for updates from other devices/tabs every 200ms (faster responsiveness)
+    const pollInterval = setInterval(() => {
       const stored = localStorage.getItem('kywash_db');
       if (stored) {
         const parsed = JSON.parse(stored);
-        // Only update if data has changed
-        if ((parsed.lastUpdate || 0) > lastUpdateRef.current) {
+        // Only update if data has actually changed
+        const newTimestamp = parsed.lastUpdate || 0;
+        if (newTimestamp > lastUpdateRef.current) {
           setData(parsed);
-          lastUpdateRef.current = parsed.lastUpdate || 0;
+          lastUpdateRef.current = newTimestamp;
         }
       }
-    }, 300);
+    }, 200); // Poll every 200ms for better real-time feel
 
     return () => {
-      clearInterval(interval);
+      clearInterval(pollInterval);
       if (broadcastChannelRef.current) {
-        broadcastChannelRef.current.close();
+        try {
+          broadcastChannelRef.current.close();
+        } catch (e) {}
+      }
+      if (activityChannelRef.current) {
+        try {
+          activityChannelRef.current.close();
+        } catch (e) {}
       }
     };
   }, []);
@@ -143,10 +174,10 @@ const useRealtimeDatabase = () => {
     setData(updated);
     lastUpdateRef.current = timestamp;
     
-    // Persist to localStorage for all devices
+    // Persist to localStorage for all devices/tabs
     localStorage.setItem('kywash_db', JSON.stringify(updated));
     
-    // Broadcast to other tabs on same device
+    // Broadcast to other tabs on same device via sync channel
     if (broadcastChannelRef.current) {
       try {
         broadcastChannelRef.current.postMessage({
@@ -218,16 +249,17 @@ const KYWash = () => {
     }
   }, []);
 
-  // Independent timer - runs continuously regardless of component state
-  // This ensures timers continue counting even when user closes tab/browser
+  // Single unified timer - runs continuously every second
+  // This ensures accurate 1-second countdown on all devices regardless of component state
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timerInterval = setInterval(() => {
       try {
         const stored = localStorage.getItem('kywash_db');
         if (!stored) return;
 
         const currentData = JSON.parse(stored);
         let hasChanges = false;
+        const now = Date.now();
         
         const updatedMachines = currentData.machines.map((m: Machine) => {
           if (m.status === 'in-use' && m.timeLeft > 0) {
@@ -235,131 +267,64 @@ const KYWash = () => {
             if (newTime === 0) {
               // Machine cycle completed
               hasChanges = true;
-              // Store completion notification
-              const completionNotif = {
-                id: Date.now(),
-                studentId: m.currentUser?.studentId,
-                machineId: m.id,
-                machineType: m.type,
-                timestamp: new Date().toISOString(),
-                message: `Your ${m.type} #${m.id} is done!`
-              };
-              const allNotifications = JSON.parse(localStorage.getItem('kywash_all_notifications') || '[]');
-              allNotifications.push(completionNotif);
-              localStorage.setItem('kywash_all_notifications', JSON.stringify(allNotifications));
-              
               return { 
                 ...m, 
                 status: 'completed', 
                 timeLeft: 0, 
-                totalCycles: m.totalCycles + 1 
+                totalCycles: m.totalCycles + 1,
+                lastUpdate: now,
               };
             }
             hasChanges = true;
-            return { ...m, timeLeft: newTime };
+            return { ...m, timeLeft: newTime, lastUpdate: now };
           }
           return m;
         });
 
-        // Always update if changes exist - this broadcasts to all devices
+        // Always broadcast if changes exist to ensure all devices see updates immediately
         if (hasChanges) {
           const updated = {
             ...currentData,
             machines: updatedMachines,
-            lastUpdate: Date.now(),
+            lastUpdate: now,
+            serverTime: now,
           };
+          
+          // Save to localStorage for all devices/tabs to read
           localStorage.setItem('kywash_db', JSON.stringify(updated));
           
-          // Broadcast update to all tabs on this device
+          // Broadcast to all tabs on current device for instant sync
           try {
             const bc = new BroadcastChannel('kywash_sync');
             bc.postMessage({
               type: 'update',
               payload: updated,
-              timestamp: Date.now(),
+              timestamp: now,
             });
             bc.close();
           } catch (e) {
-            // BroadcastChannel not supported - that's OK, localStorage will sync
+            // BroadcastChannel not supported - localStorage fallback is active
           }
-        }
-      } catch (e) {
-        console.error('Timer update error:', e);
-      }
-    }, 1000); // Update every 1 second
 
-    return () => clearInterval(timer);
-  }, []); // Empty dependency - runs once and continues forever
-
-  // Timer for machine countdowns - synchronized across all devices
-  useEffect(() => {
-    if (!sharedState?.machines) return;
-
-    // Check if any machine is currently running
-    const hasRunningMachines = sharedState.machines.some((m: Machine) => m.status === 'in-use' && m.timeLeft > 0);
-    if (!hasRunningMachines) return; // No need for additional timer if nothing is running
-
-    const timer = setInterval(() => {
-      // Get fresh data from localStorage to avoid stale closure
-      const stored = localStorage.getItem('kywash_db');
-      if (!stored) return;
-
-      try {
-        const currentData = JSON.parse(stored);
-        let hasChanges = false;
-        
-        const updatedMachines = currentData.machines.map((m: Machine) => {
-          if (m.status === 'in-use' && m.timeLeft > 0) {
-            const newTime = m.timeLeft - 1;
-            if (newTime === 0) {
-              // Machine cycle completed
-              hasChanges = true;
-              if (m.currentUser) {
-                sendPushNotification(m.currentUser, m.type, m.id);
-                logUsage(m);
-              }
-              return { 
-                ...m, 
-                status: 'completed', 
-                timeLeft: 0, 
-                totalCycles: m.totalCycles + 1 
-              };
-            }
-            hasChanges = true;
-            return { ...m, timeLeft: newTime };
-          }
-          return m;
-        });
-
-        // Only update if there were actual changes
-        if (hasChanges) {
-          const updated = {
-            ...currentData,
-            machines: updatedMachines,
-            lastUpdate: Date.now(),
-          };
-          localStorage.setItem('kywash_db', JSON.stringify(updated));
-          
-          // Broadcast update to other tabs
+          // Also notify via activity channel to trigger UI updates on all devices
           try {
-            const bc = new BroadcastChannel('kywash_sync');
-            bc.postMessage({
-              type: 'update',
-              payload: updated,
-              timestamp: Date.now(),
+            const activityBc = new BroadcastChannel('kywash_activity');
+            activityBc.postMessage({
+              type: 'timer_update',
+              timestamp: now,
             });
-            bc.close();
+            activityBc.close();
           } catch (e) {
-            // BroadcastChannel not supported
+            // Ignore
           }
         }
       } catch (e) {
-        console.error('Timer update error:', e);
+        console.error('Timer countdown error:', e);
       }
-    }, 1000); // Update every 1 second for accurate countdown
+    }, 1000); // Exactly 1 second - ensures consistent countdown
 
-    return () => clearInterval(timer);
-  }, [sharedState?.machines]);
+    return () => clearInterval(timerInterval);
+  }, []); // Empty dependencies - runs once and continues forever
 
   const requestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
