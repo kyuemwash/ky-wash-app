@@ -218,13 +218,86 @@ const KYWash = () => {
     }
   }, []);
 
+  // Independent timer - runs continuously regardless of component state
+  // This ensures timers continue counting even when user closes tab/browser
+  useEffect(() => {
+    const timer = setInterval(() => {
+      try {
+        const stored = localStorage.getItem('kywash_db');
+        if (!stored) return;
+
+        const currentData = JSON.parse(stored);
+        let hasChanges = false;
+        
+        const updatedMachines = currentData.machines.map((m: Machine) => {
+          if (m.status === 'in-use' && m.timeLeft > 0) {
+            const newTime = m.timeLeft - 1;
+            if (newTime === 0) {
+              // Machine cycle completed
+              hasChanges = true;
+              // Store completion notification
+              const completionNotif = {
+                id: Date.now(),
+                studentId: m.currentUser?.studentId,
+                machineId: m.id,
+                machineType: m.type,
+                timestamp: new Date().toISOString(),
+                message: `Your ${m.type} #${m.id} is done!`
+              };
+              const allNotifications = JSON.parse(localStorage.getItem('kywash_all_notifications') || '[]');
+              allNotifications.push(completionNotif);
+              localStorage.setItem('kywash_all_notifications', JSON.stringify(allNotifications));
+              
+              return { 
+                ...m, 
+                status: 'completed', 
+                timeLeft: 0, 
+                totalCycles: m.totalCycles + 1 
+              };
+            }
+            hasChanges = true;
+            return { ...m, timeLeft: newTime };
+          }
+          return m;
+        });
+
+        // Always update if changes exist - this broadcasts to all devices
+        if (hasChanges) {
+          const updated = {
+            ...currentData,
+            machines: updatedMachines,
+            lastUpdate: Date.now(),
+          };
+          localStorage.setItem('kywash_db', JSON.stringify(updated));
+          
+          // Broadcast update to all tabs on this device
+          try {
+            const bc = new BroadcastChannel('kywash_sync');
+            bc.postMessage({
+              type: 'update',
+              payload: updated,
+              timestamp: Date.now(),
+            });
+            bc.close();
+          } catch (e) {
+            // BroadcastChannel not supported - that's OK, localStorage will sync
+          }
+        }
+      } catch (e) {
+        console.error('Timer update error:', e);
+      }
+    }, 1000); // Update every 1 second
+
+    return () => clearInterval(timer);
+  }, []); // Empty dependency - runs once and continues forever
+
   // Timer for machine countdowns - synchronized across all devices
   useEffect(() => {
     if (!sharedState?.machines) return;
 
     // Check if any machine is currently running
     const hasRunningMachines = sharedState.machines.some((m: Machine) => m.status === 'in-use' && m.timeLeft > 0);
-    if (!hasRunningMachines) return; // No need for timer if nothing is running
+    if (!hasRunningMachines) return; // No need for additional timer if nothing is running
 
     const timer = setInterval(() => {
       // Get fresh data from localStorage to avoid stale closure
@@ -563,8 +636,9 @@ const KYWash = () => {
       timestamp: new Date().toISOString()
     };
 
+    // Only update the SPECIFIC machine that was reported, not all machines of that type
     const updatedMachines = sharedState.machines.map((m: Machine) => {
-      if (m.id === reportMachine.id) {
+      if (m.id === reportMachine.id && m.type === reportMachine.type) {
         const newReports = [...m.faultReports, newReport];
         
         // Auto-disable after 3 reports
@@ -1119,6 +1193,15 @@ const KYWash = () => {
       <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
+                </div>
+                <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
+              </div>
+            </div>
             <div className={`${darkMode ? 'bg-orange-900 border-orange-800' : 'bg-orange-50 border-orange-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setWasherWaitlistExpanded(!washerWaitlistExpanded)}>
               <div className="flex items-center justify-between">
                 <div>
@@ -1138,15 +1221,6 @@ const KYWash = () => {
                   <p className={`text-3xl font-bold ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>{getAvailableCount('dryer')}/{getTotalCount('dryer')}</p>
                 </div>
                 <Wind className={`w-10 h-10 ${darkMode ? 'text-purple-400' : 'text-purple-400'}`} />
-              </div>
-            </div>
-            <div className={`${darkMode ? 'bg-blue-900 border-blue-800' : 'bg-blue-50 border-blue-100'} rounded-xl p-4 border`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm ${darkMode ? 'text-blue-300' : 'text-blue-600'} font-medium`}>Washers</p>
-                  <p className={`text-3xl font-bold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{getAvailableCount('washer')}/{getTotalCount('washer')}</p>
-                </div>
-                <Droplet className={`w-10 h-10 ${darkMode ? 'text-blue-400' : 'text-blue-400'}`} />
               </div>
             </div>
             <div className={`${darkMode ? 'bg-pink-900 border-pink-800' : 'bg-pink-50 border-pink-100'} rounded-xl p-4 border cursor-pointer`} onClick={() => setDryerWaitlistExpanded(!dryerWaitlistExpanded)}>
